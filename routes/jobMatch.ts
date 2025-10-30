@@ -171,8 +171,12 @@ export async function jobMatchHandler(req: Request): Promise<Response> {
               "Required Industrial Experience": `${matchResult.requiredIndustrialExperienceYears || 0} years`,
               "Required Domain Experience": `${matchResult.requiredDomainExperienceYears || 0} years`,
               "Candidate Industrial Experience": matchResult.industrialExperienceDetails || `${matchResult.candidateIndustrialExperienceYears || totalExperience || 0} years`,
-              "Candidate Domain Experience": matchResult.domainExperienceDetails || `${matchResult.candidateDomainExperienceYears || 0} years`
-            }
+              "Candidate Domain Experience": matchResult.domainExperienceDetails || `${matchResult.candidateDomainExperienceYears || 0} years`,
+              "Experience Threshold Compliance": matchResult.Analysis?.["Experience Threshold Compliance"] || "Not evaluated",
+              "Recent Experience Relevance": matchResult.Analysis?.["Recent Experience Relevance"] || "Not evaluated"
+            },
+            // Add summary of analysis criteria
+            "Analysis Summary": matchResult.summary || `This match was evaluated based on role relevance, skillset matching, and experience quality. The candidate has ${totalExperience || 0} years of industrial experience and matches ${matchResult.matchedSkillsPercentage ?? 0}% of the required skills.`
           };
         };
         

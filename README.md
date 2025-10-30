@@ -6,6 +6,7 @@ AI-powered HR tools for resume parsing, job description analysis, and candidate 
 
 - **Resume Extraction**: Extract structured data from resume PDFs
 - **Job Description Extraction**: Extract structured data from job description PDFs
+- **JD Validation**: Validate job descriptions for matching suitability
 - **MCQ Generation**: Generate multiple-choice questions based on job descriptions and resumes
 - **Job Matching**: Match job descriptions with one or more resumes to determine compatibility
 - **Answer Evaluation**: Evaluate text answers for career-related questions
@@ -124,6 +125,42 @@ Extract structured data from a job description PDF.
     "requirements": ["5+ years experience", "BS in Computer Science"],
     "responsibilities": ["Develop web applications", "Collaborate with team"],
     "skills": ["JavaScript", "React", "Node.js"]
+  }
+}
+```
+
+### JD Validation
+```
+POST /validate-jd
+```
+Validate a job description for matching suitability and identify missing information.
+
+**Request:**
+- Form data with a `job_description` field containing the PDF file
+- OR JSON body with `job_description_url` field containing a URL to the PDF file
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "validation": {
+      "isValid": true,
+      "isComplete": true,
+      "errors": [],
+      "warnings": [],
+      "missingCriticalFields": [],
+      "missingRecommendedFields": [],
+      "documentType": "job_description",
+      "suitabilityScore": 95
+    },
+    "extractedData": {
+      "title": "Senior Software Engineer",
+      "company": "Tech Corp",
+      "skillsCount": 6,
+      "requirementsCount": 3
+    },
+    "detailedReport": "Job Description Validation Report\n================================\n\nDocument Type: job_description\nValidity: VALID\nCompleteness: COMPLETE\nSuitability Score: 95/100\n\nCritical Missing Information:\n  Title: Present\n  Company: Present\n  Skills: Present (6 skills listed)\n  Requirements: Present (3 requirements listed)\n\nRecommended Information:\n  Location: Present\n  Salary: Present\n  Responsibilities: Present\n  Industrial Experience: Present\n  Domain Experience: Present\n  Industrial Experience Years: Present\n  Domain Experience Years: Present\n  Employment Type: Present\n  Department: Present\n\nMatching Suitability: 95%\nAssessment: Excellent for matching\n"
   }
 }
 ```

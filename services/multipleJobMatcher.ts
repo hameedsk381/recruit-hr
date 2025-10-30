@@ -27,6 +27,7 @@ export interface MultipleMatchResult {
   resumeUrl?: string;  // URL of the resume file (if provided)
   jdFileName: string;  // Filename of the JD
   resumeFileName: string;  // Filename of the resume
+  summary: string; // Summary explaining the matching criteria evaluation
   analysis: {
     relevantMatch: boolean;
     roleAlignment?: {
@@ -43,6 +44,8 @@ export interface MultipleMatchResult {
       levelMatch: string;
       yearsMatch: string;
       relevantExperience: string;
+      domainExperienceMatch: string;
+      recentExperienceMatch: string;
     };
     rejectionReason?: string;
     // Additional fields for output formatting
@@ -139,19 +142,28 @@ async function extractWithCache(fileBuffer: Buffer, fileName: string, type: 'jd'
 }
 
 const MULTIPLE_MATCHING_PROMPT = `You are an expert HR consultant specializing in job-resume matching analysis.
-Analyze the provided job description and resume, focusing specifically on ROLE RELEVANCE and SKILLSET MATCHING.
+Analyze the provided job description and resume, focusing specifically on ROLE RELEVANCE, SKILLSET MATCHING, and EXPERIENCE QUALITY.
 
 CRITICAL EVALUATION CRITERIA:
 1. Role Relevance: How well does the candidate's background align with the job role?
 2. Technical Skills Match: What percentage of required technical skills does the candidate possess?
 3. Experience Level Alignment: Does the candidate have appropriate experience for the role level?
 4. Domain Expertise: Does the candidate have relevant industry/domain experience?
+5. Recent Experience Quality: Focus on the candidate's most recent company experience and its relevance
+6. Experience Threshold Compliance: Does the candidate meet the minimum required years of experience?
 
 SCORING GUIDELINES:
 - Only provide matches with score >= 60 (below 60 = irrelevant)
 - Score 60-70: Basic relevance with some skill gaps
 - Score 70-85: Good match with minor gaps
 - Score 85-100: Excellent match, highly relevant
+
+EXPERIENCE EVALUATION FOCUS:
+- Pay special attention to the candidate's most recent work experience
+- Evaluate if the required years of domain experience are met or exceeded
+- If the job requires X years of experience, candidates MUST have at least X years
+- Recent relevant experience should be weighted more heavily than older experience
+- For domain-specific skills (e.g., Python), only count experience if it's in the relevant domain
 
 Return a JSON response with this structure:
 {
@@ -170,14 +182,16 @@ Return a JSON response with this structure:
   "experienceAlignment": {
     "levelMatch": "<junior/mid/senior>",
     "yearsMatch": "<assessment>",
-    "relevantExperience": "<assessment>"
+    "relevantExperience": "<assessment>",
+    "domainExperienceMatch": "<evaluation of domain experience requirements>",
+    "recentExperienceMatch": "<evaluation of recent company experience relevance>"
   },
   "strengths": ["specific strength1", "specific strength2"],
   "recommendations": ["specific recommendation1", "specific recommendation2"],
   "rejectionReason": "<reason if not relevant, null if relevant>"
 }
 
-BE STRICT: Only flag as relevantMatch=true if the candidate genuinely fits the role and has meaningful skill overlap.`;
+BE STRICT: Only flag as relevantMatch=true if the candidate genuinely fits the role and has meaningful skill overlap. Pay special attention to experience thresholds - if a job requires X years and the candidate has less than X years, this should significantly impact the score. For domain-specific skills, only count experience if it's in the relevant domain.`;
 
 async function performSingleMatch(jdData: JobDescriptionData, resumeData: ResumeData): Promise<any> {
   try {
@@ -191,6 +205,23 @@ async function performSingleMatch(jdData: JobDescriptionData, resumeData: Resume
     if (cached) {
       console.log('[MultipleJobMatcher] Using cached match result');
       return cached;
+    }
+    
+    // Format the experience data for better analysis
+    let formattedExperience = 'Not specified';
+    if (Array.isArray(resumeData.experience) && resumeData.experience.length > 0) {
+      if (typeof resumeData.experience[0] === 'object' && resumeData.experience[0] !== null) {
+        // Format structured experience data
+        formattedExperience = resumeData.experience.map((exp: any, index) => {
+          const role = exp.role || 'Not specified';
+          const company = exp.company || 'Not specified';
+          const duration = exp.duration || 'Not specified';
+          return `${index + 1}. ${role} at ${company} (${duration})`;
+        }).join('\n');
+      } else {
+        // Format string array experience
+        formattedExperience = resumeData.experience.join('\n');
+      }
     }
     
     const prompt = `
@@ -208,18 +239,27 @@ Location: ${jdData.location || 'Not specified'}
 Resume:
 Name: ${resumeData.name}
 Current Skills: ${resumeData.skills?.join(', ') || 'Not specified'}
-Work Experience: ${resumeData.experience?.join(', ') || 'Not specified'}
+Work Experience: 
+${formattedExperience}
 Education: ${resumeData.education?.join(', ') || 'Not specified'}
-Total Experience: ${resumeData.totalIndustrialExperienceYears || 0} years
+Total Industrial Experience: ${resumeData.totalIndustrialExperienceYears || 0} years
+Total Domain Experience: ${resumeData.totalDomainExperienceYears || 0} years
 Certifications: ${resumeData.certifications?.join(', ') || 'Not specified'}
 
-ANALYZE CAREFULLY:
+CRITICAL ANALYSIS POINTS:
 1. Does this candidate's background align with the job role and requirements?
 2. What percentage of required technical skills does the candidate possess?
 3. Is the experience level appropriate for this role?
-4. Are there any deal-breaker skill gaps?
+4. Does the candidate meet the minimum required years of industrial experience (${jdData.requiredIndustrialExperienceYears || 0} years)?
+5. Does the candidate meet the minimum required years of domain experience (${jdData.requiredDomainExperienceYears || 0} years)?
+6. How relevant and recent is the candidate's most recent work experience?
+7. Are there any deal-breaker skill gaps?
 
-Be strict in evaluation - only mark as relevant if there's genuine role and skill alignment.
+BE STRICT IN YOUR EVALUATION:
+- If the candidate has less than the required years of experience, this should significantly impact the score
+- Focus on the quality and relevance of recent experience
+- For domain-specific skills (e.g., Python), only count experience if it's in the relevant domain
+- If a job requires X years of domain experience, candidates MUST meet or exceed that threshold
 `;
     
     const response = await groqChatCompletion(
@@ -266,7 +306,13 @@ Be strict in evaluation - only mark as relevant if there's genuine role and skil
           criticalMissingSkills: [],
           skillGapSeverity: "high"
         },
-        experienceAlignment: { levelMatch: "unknown", yearsMatch: "unknown", relevantExperience: "unknown" },
+        experienceAlignment: { 
+          levelMatch: "unknown", 
+          yearsMatch: "unknown", 
+          relevantExperience: "unknown",
+          domainExperienceMatch: "unknown",
+          recentExperienceMatch: "unknown"
+        },
         strengths: [],
         recommendations: ["Unable to analyze - please check data quality"],
         rejectionReason: "AI response parsing failed"
@@ -450,6 +496,20 @@ export async function matchMultipleJDsWithMultipleResumes(
       
       const matchAnalysis = await performSingleMatch(jdExtraction.data, resumeExtraction.data);
       
+      // Generate a summary explaining the matching criteria evaluation
+      let summary = '';
+      if (matchAnalysis.roleAlignment && matchAnalysis.skillsetMatch && matchAnalysis.experienceAlignment) {
+        summary = `This match has a score of ${matchAnalysis.matchScore || 0}%. `;
+        summary += `Role alignment is assessed as ${matchAnalysis.roleAlignment.assessment || 'not specified'}. `;
+        summary += `The candidate possesses ${matchAnalysis.skillsetMatch.technicalSkillsMatch || 0}% of the required technical skills. `;
+        summary += `Experience evaluation shows ${matchAnalysis.experienceAlignment.relevantExperience || 'no specific assessment'}. `;
+        summary += `Domain experience match: ${matchAnalysis.experienceAlignment.domainExperienceMatch || 'not specified'}. `;
+        summary += `Recent experience relevance: ${matchAnalysis.experienceAlignment.recentExperienceMatch || 'not specified'}.`;
+      } else {
+        summary = `This match has a score of ${matchAnalysis.matchScore || 0}%. `;
+        summary += `Detailed criteria evaluation is not available.`;
+      }
+      
       // Return ALL matches regardless of score (no filtering)
       const matchResult: MultipleMatchResult = {
         jdIndex: jdExtraction.index,
@@ -465,6 +525,7 @@ export async function matchMultipleJDsWithMultipleResumes(
         resumeFileName: resumeExtraction.fileName,
         jdUrl: input.jdUrls?.[jdExtraction.index],
         resumeUrl: input.resumeUrls?.[resumeExtraction.index],
+        summary: summary, // Add the summary field
         analysis: {
           ...matchAnalysis,
           // Add resume data for output formatting

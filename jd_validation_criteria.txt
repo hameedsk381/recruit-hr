@@ -1,0 +1,22 @@
+Job Description (JD) Validation Criteria
+
+Purpose:
+To ensure every Job Description (JD) is complete, structured, and ready for AI-based resume matching or ATS processing.
+
+JD Validation Summary
+A validated JD must clearly answer the following:
+1. What is the role? (Title, Summary)
+2. What skills are required? (Key Skills)
+3. What will the candidate do? (Responsibilities)
+4. What level and qualification are needed? (Experience, Education)
+5. Where and how will they work? (Location, Employment Type)
+
+If any of these areas are incomplete or unclear, the JD should be marked 'Invalid' or 'Needs Revision' before processing.
+
+JD Validation Outcome
+
+Note:
+For high-quality matches, JDs should be:
+• Clear, structured, and keyword-rich.
+• Free from vague or creative job titles.
+• Written in bullet points rather than long paragraphs.

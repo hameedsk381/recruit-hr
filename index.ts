@@ -11,6 +11,7 @@ import { multipleJobMatchHandler } from "./routes/multipleJobMatch";
 import { jdExtractorNewHandler } from "./routes/jdExtractorNew";
 import { jdExtractorStreamingHandler } from "./routes/jdExtractorStreaming";
 import { mongoNLQueryHandler, mongoDatabaseInfoHandler } from "./routes/mongoNLQuery";
+import { jdValidateHandler } from "./routes/jdValidate"; // Added import for JD validation
 import { initializeRedisClient } from "./utils/redisClient";
 import { initializeMongoClient } from "./utils/mongoClient";
 
@@ -180,6 +181,13 @@ const server = serve({
         return response;
       }
 
+      // Added JD validation route
+      if (req.method === "POST" && url.pathname === "/validate-jd") {
+        const response = await jdValidateHandler(req);
+        logRequest(req, startTime, response.status);
+        return response;
+      }
+
       const notFoundResponse = new Response(
         JSON.stringify({ 
           success: false, 
@@ -189,6 +197,7 @@ const server = serve({
             "POST /extract-jd - Extract data from a job description PDF",
             "POST /extract-jd-new - Extract job description data in job posting format",
             "POST /extract-jd-streaming - Extract job description data with streaming responses",
+            "POST /validate-jd - Validate job description for matching suitability",
             "POST /generate-mcq - Generate MCQ questions based on a job description and resume",
             "POST /generate-voice-questions - Generate voice interview questions based on a job description (JD-only)",
             "POST /match - Match a job description with one or more resumes (supports both 'resume' for single file and 'resumes' for multiple files)",

@@ -5,7 +5,31 @@ import { getLLMCache, setLLMCache } from "../utils/llmCache";
 import { createHash } from "crypto";
 
 const JOB_MATCHING_PROMPT = `You are an expert HR consultant specializing in job-resume matching analysis.
-Analyze the provided job description and resume, and provide a comprehensive matching analysis in the following JSON format:
+Analyze the provided job description and resume, focusing specifically on ROLE RELEVANCE, SKILLSET MATCHING, and EXPERIENCE QUALITY.
+
+CRITICAL EVALUATION CRITERIA:
+1. Role Relevance: How well does the candidate's background align with the job role?
+2. Technical Skills Match: What percentage of required technical skills does the candidate possess?
+3. Experience Level Alignment: Does the candidate have appropriate experience for the role level?
+4. Domain Expertise: Does the candidate have relevant industry/domain experience?
+5. Recent Experience Quality: Focus on the candidate's most recent company experience and its relevance
+6. Experience Threshold Compliance: Does the candidate meet the minimum required years of experience?
+
+SCORING GUIDELINES:
+- Score 0-100 with the following breakdown:
+- Score 85-100: Excellent match, highly relevant
+- Score 70-84: Good match with minor gaps
+- Score 60-69: Basic relevance with some skill gaps
+- Score 0-59: Poor match or doesn't meet minimum requirements
+
+EXPERIENCE EVALUATION FOCUS:
+- Pay special attention to the candidate's most recent work experience
+- Evaluate if the required years of domain experience are met or exceeded
+- If the job requires X years of experience, candidates MUST have at least X years
+- Recent relevant experience should be weighted more heavily than older experience
+- For domain-specific skills (e.g., Python), only count experience if it's in the relevant domain
+
+Return a JSON response with this structure:
 {
   "Id": "Unique identifier for this match analysis",
   "Resume Data": {
@@ -33,11 +57,13 @@ Analyze the provided job description and resume, and provide a comprehensive mat
     "Required Industrial Experience": "Required industrial experience description",
     "Required Domain Experience": "Required domain experience description",
     "Candidate Industrial Experience": "Candidate industrial experience description",
-    "Candidate Domain Experience": "Candidate domain experience description"
+    "Candidate Domain Experience": "Candidate domain experience description",
+    "Experience Threshold Compliance": "Evaluation of whether candidate meets minimum experience requirements",
+    "Recent Experience Relevance": "Assessment of recent work experience quality and relevance"
   }
 }
 
-Provide a detailed analysis with specific examples from the resume that match or don't match the job requirements. Focus on skills, experience, and qualifications.`;
+Provide a detailed analysis with specific examples from the resume that match or don't match the job requirements. Focus on skills, experience, and qualifications. Pay special attention to experience thresholds - if a job requires X years and the candidate has less than X years, this should be clearly noted. For domain-specific skills, only count experience if it's in the relevant domain.`;
 
 // Function to extract JSON from AI response
 function extractJsonFromResponse(response: string): any {
@@ -208,6 +234,8 @@ export interface MatchResult {
     "Required Domain Experience": string;
     "Candidate Industrial Experience": string;
     "Candidate Domain Experience": string;
+    "Experience Threshold Compliance"?: string;
+    "Recent Experience Relevance"?: string;
   };
   matchScore?: number;
   unmatchedSkills?: string[];
@@ -222,6 +250,7 @@ export interface MatchResult {
   domainExperienceDetails?: string;
   matchedSkillsPercentage?: number;
   unmatchedSkillsPercentage?: number;
+  summary?: string; // Summary explaining the matching criteria evaluation
 }
 
 export async function matchJobWithResume(
@@ -239,6 +268,23 @@ export async function matchJobWithResume(
     if (cachedResult) {
       console.log('[JobMatcher] Returning cached result');
       return cachedResult as MatchResult;
+    }
+
+    // Format the experience data for better analysis
+    let formattedExperience = 'Not specified';
+    if (Array.isArray(resume.experience) && resume.experience.length > 0) {
+      if (typeof resume.experience[0] === 'object' && resume.experience[0] !== null) {
+        // Format structured experience data
+        formattedExperience = resume.experience.map((exp: any, index) => {
+          const role = exp.role || 'Not specified';
+          const company = exp.company || 'Not specified';
+          const duration = exp.duration || 'Not specified';
+          return `${index + 1}. ${role} at ${company} (${duration})`;
+        }).join('\n');
+      } else {
+        // Format string array experience
+        formattedExperience = resume.experience.join('\n');
+      }
     }
 
     // Create a comprehensive prompt with job description and resume data
@@ -275,7 +321,7 @@ Candidate Skills:
 ${resume.skills.join('\n')}
 
 Candidate Experience:
-${Array.isArray(resume.experience) ? JSON.stringify(resume.experience, null, 2) : 'Not specified'}
+${formattedExperience}
 
 Candidate Industrial Experience:
 ${Array.isArray(resume.industrialExperience) ? resume.industrialExperience.join('\n') : 'Not specified'}
@@ -292,6 +338,21 @@ ${resume.education.join('\n')}
 
 Candidate Certifications:
 ${resume.certifications.join('\n')}
+
+CRITICAL ANALYSIS POINTS:
+1. Does this candidate's background align with the job role and requirements?
+2. What percentage of required technical skills does the candidate possess?
+3. Is the experience level appropriate for this role?
+4. Does the candidate meet the minimum required years of industrial experience (${jobDescription.requiredIndustrialExperienceYears || 0} years)?
+5. Does the candidate meet the minimum required years of domain experience (${jobDescription.requiredDomainExperienceYears || 0} years)?
+6. How relevant and recent is the candidate's most recent work experience?
+7. Are there any deal-breaker skill gaps?
+
+BE STRICT IN YOUR EVALUATION:
+- If the candidate has less than the required years of experience, this should significantly impact the score
+- Focus on the quality and relevance of recent experience
+- For domain-specific skills (e.g., Python), only count experience if it's in the relevant domain
+- If a job requires X years of domain experience, candidates MUST meet or exceed that threshold
 `;
 
     // Use Groq to analyze the match with moderate temperature for balanced analysis
@@ -315,12 +376,41 @@ ${resume.certifications.join('\n')}
         // Generate a UUID for the Id field
         const id = crypto.randomUUID();
         
-        // Calculate matching score based on skill match percentage
+        // Check domain experience compliance first
+        const domainExperienceCompliant = (!jobDescription.requiredDomainExperienceYears || 
+          (jobDescription.requiredDomainExperienceYears && resume.totalDomainExperienceYears && 
+           resume.totalDomainExperienceYears >= jobDescription.requiredDomainExperienceYears));
+        
+        // Calculate matching score based on skill match percentage with domain experience weighting
         const totalSkills = jobDescription.skills.length;
-        const matchedSkills = jobDescription.skills.filter(skill => resume.skills.includes(skill)).length;
-        const matchingScore = totalSkills > 0 ? Math.round((matchedSkills / totalSkills) * 100) : 70;
-        const matchedSkillsPercentage = totalSkills > 0 ? Math.round((matchedSkills / totalSkills) * 100) : 0;
-        const unmatchedSkillsPercentage = totalSkills > 0 ? Math.round(((totalSkills - matchedSkills) / totalSkills) * 100) : 0;
+        let matchedSkills = jobDescription.skills.filter(skill => resume.skills.includes(skill));
+        
+        // If domain experience is not compliant, significantly reduce the match score
+        let matchingScore, matchedSkillsPercentage, unmatchedSkillsPercentage;
+        if (!domainExperienceCompliant) {
+          // If domain experience requirement not met, set score to 0 or very low
+          matchingScore = 0;
+          matchedSkills = []; // No skills match if domain experience requirement not met
+          matchedSkillsPercentage = 0;
+          unmatchedSkillsPercentage = totalSkills > 0 ? 100 : 0;
+        } else {
+          matchingScore = totalSkills > 0 ? Math.round((matchedSkills.length / totalSkills) * 100) : 70;
+          matchedSkillsPercentage = totalSkills > 0 ? Math.round((matchedSkills.length / totalSkills) * 100) : 0;
+          unmatchedSkillsPercentage = totalSkills > 0 ? Math.round(((totalSkills - matchedSkills.length) / totalSkills) * 100) : 0;
+        }
+        
+        // Experience threshold compliance check
+        const industrialExperienceCompliance = jobDescription.requiredIndustrialExperienceYears && resume.totalIndustrialExperienceYears ? 
+          (resume.totalIndustrialExperienceYears >= jobDescription.requiredIndustrialExperienceYears ? 
+            `Candidate meets the required ${jobDescription.requiredIndustrialExperienceYears} years of industrial experience.` : 
+            `Candidate falls short of the required ${jobDescription.requiredIndustrialExperienceYears} years of industrial experience.`) : 
+          "Experience requirement not specified.";
+          
+        const domainExperienceCompliance = jobDescription.requiredDomainExperienceYears && resume.totalDomainExperienceYears ? 
+          (resume.totalDomainExperienceYears >= jobDescription.requiredDomainExperienceYears ? 
+            `Candidate meets the required ${jobDescription.requiredDomainExperienceYears} years of domain experience.` : 
+            `Candidate falls short of the required ${jobDescription.requiredDomainExperienceYears} years of domain experience.`) : 
+          "Domain experience requirement not specified.";
         
         // Create the proper structure
         matchResult = {
@@ -344,7 +434,7 @@ ${resume.certifications.join('\n')}
           Analysis: {
             "Matching Score": matchingScore,
             "Unmatched Skills": jobDescription.skills.filter(skill => !resume.skills.includes(skill)),
-            "Matched Skills": jobDescription.skills.filter(skill => resume.skills.includes(skill)),
+            "Matched Skills": matchedSkills,
             "Matched Skills Percentage": matchedSkillsPercentage,
             "Unmatched Skills Percentage": unmatchedSkillsPercentage,
             "Strengths": [`Candidate has ${resume.totalIndustrialExperienceYears || 0} years of relevant experience`],
@@ -354,17 +444,15 @@ ${resume.certifications.join('\n')}
             ],
             "Required Industrial Experience": `${jobDescription.requiredIndustrialExperienceYears || 0} years`,
             "Required Domain Experience": `${jobDescription.requiredDomainExperienceYears || 0} years`,
-            "Candidate Industrial Experience": `Candidate has ${resume.totalIndustrialExperienceYears || 0} years of industrial experience${jobDescription.requiredIndustrialExperienceYears && resume.totalIndustrialExperienceYears ? 
-              (resume.totalIndustrialExperienceYears >= jobDescription.requiredIndustrialExperienceYears ? 
-                `, which meets the required ${jobDescription.requiredIndustrialExperienceYears} years.` : 
-                `, which falls short of the required ${jobDescription.requiredIndustrialExperienceYears} years.`) : 
-              "."}`,
-            "Candidate Domain Experience": `${resume.totalDomainExperienceYears || 0} years`
+            "Candidate Industrial Experience": `Candidate has ${resume.totalIndustrialExperienceYears || 0} years of industrial experience`,
+            "Candidate Domain Experience": `${resume.totalDomainExperienceYears || 0} years`,
+            "Experience Threshold Compliance": `${industrialExperienceCompliance} ${domainExperienceCompliance}`,
+            "Recent Experience Relevance": "Evaluated based on most recent work experience"
           },
           // Additional properties for direct access in jobMatch.ts
           matchScore: matchingScore,
           unmatchedSkills: jobDescription.skills.filter(skill => !resume.skills.includes(skill)),
-          matchedSkills: jobDescription.skills.filter(skill => resume.skills.includes(skill)),
+          matchedSkills: matchedSkills,
           strengths: [`Candidate has ${resume.totalIndustrialExperienceYears || 0} years of relevant experience`],
           recommendations: [
             `Consider acquiring skills in: ${jobDescription.skills.filter(skill => !resume.skills.includes(skill)).join(', ') || 'N/A'}`,
@@ -374,14 +462,8 @@ ${resume.certifications.join('\n')}
           requiredDomainExperienceYears: jobDescription.requiredDomainExperienceYears || 0,
           candidateIndustrialExperienceYears: resume.totalIndustrialExperienceYears || 0,
           candidateDomainExperienceYears: resume.totalDomainExperienceYears || 0,
-          industrialExperienceDetails: `Candidate has ${resume.totalIndustrialExperienceYears || 0} years of industrial experience${jobDescription.requiredIndustrialExperienceYears && resume.totalIndustrialExperienceYears ? 
-            (resume.totalIndustrialExperienceYears >= jobDescription.requiredIndustrialExperienceYears ? 
-              `, which meets the required ${jobDescription.requiredIndustrialExperienceYears} years.` : 
-              `, which falls short of the required ${jobDescription.requiredIndustrialExperienceYears} years.`) : 
-            "."}`,
-          domainExperienceDetails: `${resume.totalDomainExperienceYears || 0} years`,
-          matchedSkillsPercentage,
-          unmatchedSkillsPercentage
+          industrialExperienceDetails: `Candidate has ${resume.totalIndustrialExperienceYears || 0} years of industrial experience`,
+          domainExperienceDetails: `${resume.totalDomainExperienceYears || 0} years`
         };
       }
       
@@ -407,6 +489,20 @@ ${resume.certifications.join('\n')}
         matchResult.unmatchedSkillsPercentage = totalSkills > 0 ? Math.round(((totalSkills - matchedCount) / totalSkills) * 100) : 0;
       }
       
+      // Add a summary explaining the matching criteria evaluation
+      if (matchResult.Analysis) {
+        const totalSkills = (matchResult.matchedSkills?.length || 0) + (matchResult.unmatchedSkills?.length || 0);
+        const matchedPercentage = totalSkills > 0 ? Math.round(((matchResult.matchedSkills?.length || 0) / totalSkills) * 100) : 0;
+        
+        matchResult.summary = `This match has a score of ${matchResult.Analysis["Matching Score"] || 0}%. `;
+        matchResult.summary += `The candidate has ${matchResult.candidateIndustrialExperienceYears || 0} years of industrial experience `;
+        matchResult.summary += `and ${matchResult.candidateDomainExperienceYears || 0} years of domain experience. `;
+        matchResult.summary += `They match ${matchedPercentage}% of the required skills. `;
+        matchResult.summary += `Experience threshold compliance: ${matchResult.Analysis["Experience Threshold Compliance"] || 'not evaluated'}.`;
+      } else {
+        matchResult.summary = `This match has a score of ${matchResult.matchScore || 0}%. Detailed criteria evaluation is not available.`;
+      }
+      
       // Cache the result for 24 hours
       await setLLMCache(cacheKey, matchResult, 1000 * 60 * 60 * 24);
       
@@ -418,12 +514,41 @@ ${resume.certifications.join('\n')}
       
       // Fallback: construct a basic response if AI parsing fails
       const id = crypto.randomUUID();
-      // Calculate matching score based on skill match percentage
+      // Check domain experience compliance first
+      const domainExperienceCompliant = (!jobDescription.requiredDomainExperienceYears || 
+        (jobDescription.requiredDomainExperienceYears && resume.totalDomainExperienceYears && 
+         resume.totalDomainExperienceYears >= jobDescription.requiredDomainExperienceYears));
+      
+      // Calculate matching score based on skill match percentage with domain experience weighting
       const totalSkills = jobDescription.skills.length;
-      const matchedSkills = jobDescription.skills.filter(skill => resume.skills.includes(skill)).length;
-      const matchingScore = totalSkills > 0 ? Math.round((matchedSkills / totalSkills) * 100) : 70;
-      const matchedSkillsPercentage = totalSkills > 0 ? Math.round((matchedSkills / totalSkills) * 100) : 0;
-      const unmatchedSkillsPercentage = totalSkills > 0 ? Math.round(((totalSkills - matchedSkills) / totalSkills) * 100) : 0;
+      let matchedSkills = jobDescription.skills.filter(skill => resume.skills.includes(skill));
+      
+      // If domain experience is not compliant, significantly reduce the match score
+      let matchingScore, matchedSkillsPercentage, unmatchedSkillsPercentage;
+      if (!domainExperienceCompliant) {
+        // If domain experience requirement not met, set score to 0 or very low
+        matchingScore = 0;
+        matchedSkills = []; // No skills match if domain experience requirement not met
+        matchedSkillsPercentage = 0;
+        unmatchedSkillsPercentage = totalSkills > 0 ? 100 : 0;
+      } else {
+        matchingScore = totalSkills > 0 ? Math.round((matchedSkills.length / totalSkills) * 100) : 70;
+        matchedSkillsPercentage = totalSkills > 0 ? Math.round((matchedSkills.length / totalSkills) * 100) : 0;
+        unmatchedSkillsPercentage = totalSkills > 0 ? Math.round(((totalSkills - matchedSkills.length) / totalSkills) * 100) : 0;
+      }
+      
+      // Experience threshold compliance check
+      const industrialExperienceCompliance = jobDescription.requiredIndustrialExperienceYears && resume.totalIndustrialExperienceYears ? 
+        (resume.totalIndustrialExperienceYears >= jobDescription.requiredIndustrialExperienceYears ? 
+          `Candidate meets the required ${jobDescription.requiredIndustrialExperienceYears} years of industrial experience.` : 
+          `Candidate falls short of the required ${jobDescription.requiredIndustrialExperienceYears} years of industrial experience.`) : 
+        "Experience requirement not specified.";
+        
+      const domainExperienceCompliance = jobDescription.requiredDomainExperienceYears && resume.totalDomainExperienceYears ? 
+        (resume.totalDomainExperienceYears >= jobDescription.requiredDomainExperienceYears ? 
+          `Candidate meets the required ${jobDescription.requiredDomainExperienceYears} years of domain experience.` : 
+          `Candidate falls short of the required ${jobDescription.requiredDomainExperienceYears} years of domain experience.`) : 
+        "Domain experience requirement not specified.";
       
       const matchResult: MatchResult = {
         Id: id,
@@ -446,7 +571,7 @@ ${resume.certifications.join('\n')}
         Analysis: {
           "Matching Score": matchingScore,
           "Unmatched Skills": jobDescription.skills.filter(skill => !resume.skills.includes(skill)),
-          "Matched Skills": jobDescription.skills.filter(skill => resume.skills.includes(skill)),
+          "Matched Skills": matchedSkills,
           "Matched Skills Percentage": matchedSkillsPercentage,
           "Unmatched Skills Percentage": unmatchedSkillsPercentage,
           "Strengths": [`Candidate has ${resume.totalIndustrialExperienceYears || 0} years of relevant experience`],
@@ -456,17 +581,15 @@ ${resume.certifications.join('\n')}
           ],
           "Required Industrial Experience": `${jobDescription.requiredIndustrialExperienceYears || 0} years`,
           "Required Domain Experience": `${jobDescription.requiredDomainExperienceYears || 0} years`,
-          "Candidate Industrial Experience": `Candidate has ${resume.totalIndustrialExperienceYears || 0} years of industrial experience${jobDescription.requiredIndustrialExperienceYears && resume.totalIndustrialExperienceYears ? 
-            (resume.totalIndustrialExperienceYears >= jobDescription.requiredIndustrialExperienceYears ? 
-              `, which meets the required ${jobDescription.requiredIndustrialExperienceYears} years.` : 
-              `, which falls short of the required ${jobDescription.requiredIndustrialExperienceYears} years.`) : 
-            "."}`,
-          "Candidate Domain Experience": `${resume.totalDomainExperienceYears || 0} years`
+          "Candidate Industrial Experience": `Candidate has ${resume.totalIndustrialExperienceYears || 0} years of industrial experience`,
+          "Candidate Domain Experience": `${resume.totalDomainExperienceYears || 0} years`,
+          "Experience Threshold Compliance": `${industrialExperienceCompliance} ${domainExperienceCompliance}`,
+          "Recent Experience Relevance": "Evaluated based on most recent work experience"
         },
         // Additional properties for direct access in jobMatch.ts
         matchScore: matchingScore,
         unmatchedSkills: jobDescription.skills.filter(skill => !resume.skills.includes(skill)),
-        matchedSkills: jobDescription.skills.filter(skill => resume.skills.includes(skill)),
+        matchedSkills: matchedSkills,
         strengths: [`Candidate has ${resume.totalIndustrialExperienceYears || 0} years of relevant experience`],
         recommendations: [
           `Consider acquiring skills in: ${jobDescription.skills.filter(skill => !resume.skills.includes(skill)).join(', ') || 'N/A'}`,
@@ -476,12 +599,9 @@ ${resume.certifications.join('\n')}
         requiredDomainExperienceYears: jobDescription.requiredDomainExperienceYears || 0,
         candidateIndustrialExperienceYears: resume.totalIndustrialExperienceYears || 0,
         candidateDomainExperienceYears: resume.totalDomainExperienceYears || 0,
-        industrialExperienceDetails: `Candidate has ${resume.totalIndustrialExperienceYears || 0} years of industrial experience${jobDescription.requiredIndustrialExperienceYears && resume.totalIndustrialExperienceYears ? 
-          (resume.totalIndustrialExperienceYears >= jobDescription.requiredIndustrialExperienceYears ? 
-            `, which meets the required ${jobDescription.requiredIndustrialExperienceYears} years.` : 
-            `, which falls short of the required ${jobDescription.requiredIndustrialExperienceYears} years.`) : 
-          "."}`,
-        domainExperienceDetails: `${resume.totalDomainExperienceYears || 0} years`
+        industrialExperienceDetails: `Candidate has ${resume.totalIndustrialExperienceYears || 0} years of industrial experience`,
+        domainExperienceDetails: `${resume.totalDomainExperienceYears || 0} years`,
+        summary: `This match has a score of ${matchingScore}%. The candidate has ${resume.totalIndustrialExperienceYears || 0} years of industrial experience and ${resume.totalDomainExperienceYears || 0} years of domain experience. Experience threshold compliance: ${industrialExperienceCompliance} ${domainExperienceCompliance}.`
       };
       
       // Cache the fallback result
