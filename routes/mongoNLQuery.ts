@@ -7,17 +7,19 @@ import { createLogger } from '../utils/logger';
 import { executeEnhancedNLQuery, getEnhancedDatabaseInfo } from '../services/enhancedMongoService';
 import { getDatabaseInfo } from '../services/mcpMongoService';
 
-export async function mongoNLQueryHandler(req: Request): Promise<Response> {
+import { AuthContext } from '../middleware/authMiddleware';
+
+export async function mongoNLQueryHandler(req: Request, context: AuthContext): Promise<Response> {
   const requestId = crypto.randomUUID();
-  const logger = createLogger(requestId, 'MongoNLQueryHandler');
-  
+  const logger = createLogger(requestId, 'MongoNLQueryHandler', context.tenantId, context.userId);
+
   try {
     logger.info('Received MongoDB natural language query request');
-    
+
     // Parse request body
     const body = await req.json();
     const { query, collection, dryRun, maxResults } = body;
-    
+
     // Validate input
     if (!query || typeof query !== 'string' || query.trim().length === 0) {
       logger.error('Invalid query provided');
@@ -33,7 +35,7 @@ export async function mongoNLQueryHandler(req: Request): Promise<Response> {
         }
       );
     }
-    
+
     // Check if this is a database metadata question
     const metadataKeywords = [
       'how many collection',
@@ -43,16 +45,16 @@ export async function mongoNLQueryHandler(req: Request): Promise<Response> {
       'available collection',
       'database collection'
     ];
-    
+
     const lowerQuery = query.toLowerCase();
     const isMetadataQuery = metadataKeywords.some(keyword => lowerQuery.includes(keyword));
-    
+
     if (isMetadataQuery) {
       logger.info('Detected database metadata query, suggesting /mongo-info endpoint');
-      
+
       // Get the actual database info to answer the question
       const dbInfo = await getDatabaseInfo();
-      
+
       return new Response(
         JSON.stringify({
           success: true,
@@ -70,25 +72,26 @@ export async function mongoNLQueryHandler(req: Request): Promise<Response> {
         }
       );
     }
-    
+
     logger.info('Processing natural language query', {
       query: query.substring(0, 100),
       collection: collection || 'auto-detect',
       dryRun: dryRun || false,
       maxResults: maxResults || 100
     });
-    
-    // Execute the natural language query
+
+    // Execute the natural language query with tenant isolation
     const result = await executeEnhancedNLQuery(
       query,
       {
+        tenantId: context.tenantId,
         targetCollection: collection,
         dryRun: dryRun || false,
         maxResults: maxResults || 100,
-        readOnly: true // Default to read-only for safety
+        readOnly: true
       }
     );
-    
+
     if (!result.success) {
       logger.error('Query execution failed', undefined, { error: result.error });
       return new Response(
@@ -104,14 +107,14 @@ export async function mongoNLQueryHandler(req: Request): Promise<Response> {
         }
       );
     }
-    
+
     logger.info('Query executed successfully', {
       collection: result.query.collection,
       operation: result.query.operation,
       resultCount: result.resultCount,
       executionTime: result.executionTime
     });
-    
+
     // Return results
     return new Response(
       JSON.stringify({
@@ -135,10 +138,10 @@ export async function mongoNLQueryHandler(req: Request): Promise<Response> {
         headers: { 'Content-Type': 'application/json' }
       }
     );
-    
+
   } catch (error) {
     logger.error('MongoDB NL query request failed', error instanceof Error ? error : new Error(String(error)));
-    
+
     return new Response(
       JSON.stringify({
         success: false,
@@ -158,20 +161,20 @@ export async function mongoNLQueryHandler(req: Request): Promise<Response> {
  * Get Database Info Handler
  * Returns available collections and their schemas
  */
-export async function mongoDatabaseInfoHandler(req: Request): Promise<Response> {
+export async function mongoDatabaseInfoHandler(req: Request, context: AuthContext): Promise<Response> {
   const requestId = crypto.randomUUID();
-  const logger = createLogger(requestId, 'MongoDatabaseInfoHandler');
-  
+  const logger = createLogger(requestId, 'MongoDatabaseInfoHandler', context.tenantId, context.userId);
+
   try {
     logger.info('Received database info request');
-    
+
     const dbInfo = await getEnhancedDatabaseInfo();
-    
+
     logger.info('Database info retrieved successfully', {
       collectionsCount: dbInfo.collections.length,
       totalDocuments: dbInfo.statistics.totalDocuments
     });
-    
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -186,10 +189,10 @@ export async function mongoDatabaseInfoHandler(req: Request): Promise<Response> 
         headers: { 'Content-Type': 'application/json' }
       }
     );
-    
+
   } catch (error) {
     logger.error('Database info request failed', error instanceof Error ? error : new Error(String(error)));
-    
+
     return new Response(
       JSON.stringify({
         success: false,

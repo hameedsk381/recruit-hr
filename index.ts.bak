@@ -1,40 +1,21 @@
 import { serve } from "bun";
 import { config } from "dotenv";
 import { resumeExtractHandler } from "./routes/resumeExtract";
+import { jdExtractHandler } from "./routes/jdExtract";
+import { mcqGenerateHandler } from "./routes/mcqGenerate";
 import { jobMatchHandler } from "./routes/jobMatch";
+import { voiceInterviewHandler } from "./routes/voiceInterview";
 import { answerEvaluateHandler } from "./routes/answerEvaluate";
+import { audioEvaluateHandler } from "./routes/audioEvaluate";
 import { multipleJobMatchHandler } from "./routes/multipleJobMatch";
+import { jdExtractorNewHandler } from "./routes/jdExtractorNew";
+import { jdExtractorStreamingHandler } from "./routes/jdExtractorStreaming";
 import { mongoNLQueryHandler, mongoDatabaseInfoHandler } from "./routes/mongoNLQuery";
-import { jobStatusHandler } from "./routes/jobStatus";
-import { analyticsHandler } from "./routes/analytics";
-import { copilotChatHandler } from "./routes/copilotChat";
+import { jdValidateHandler } from "./routes/jdValidate";
 import { recruiterAssessHandler, recruiterBatchAssessHandler } from "./routes/recruiterAssess";
-import { InterviewService } from "./services/interviewService";
-import {
-  listInterviewsHandler,
-  scheduleInterviewHandler,
-  suggestTimesHandler,
-  cancelInterviewHandler,
-  rescheduleInterviewHandler
-} from "./routes/interviews";
-import { getCalendarStatusHandler, connectCalendarHandler } from "./routes/calendar";
 import { initializeRedisClient } from "./utils/redisClient";
 import { initializeMongoClient } from "./utils/mongoClient";
 import { validateRequestAuth } from "./middleware/authMiddleware";
-import { loginHandler } from "./routes/auth";
-import {
-  submitScorecardHandler,
-  getScorecardHandler,
-  getCandidateScorecardsHandler,
-  synthesizeScorecardsHandler
-} from "./routes/scorecards";
-import { jdExtractHandler } from "./routes/jdExtract";
-import { jdExtractorNewHandler } from "./routes/jdExtractorNew";
-import { jdExtractorStreamingHandler } from "./routes/jdExtractorStreaming";
-import { jdValidateHandler } from "./routes/jdValidate";
-import { mcqGenerateHandler } from "./routes/mcqGenerate";
-import { voiceInterviewHandler } from "./routes/voiceInterview";
-import { audioEvaluateHandler } from "./routes/audioEvaluate";
 
 // Load environment variables
 config();
@@ -143,29 +124,20 @@ const server = serve({
     const PUBLIC_ROUTES = [
       "/",
       "/health",
-      "/mongo-info",
-      "/auth/login"
+      "/mongo-info"
     ];
 
-    // Auth check (Enterprise Isolation)
-    let context: any = null;
+    // Enforce Auth for non-public routes
     if (!PUBLIC_ROUTES.includes(url.pathname)) {
       const authResult = await validateRequestAuth(req);
       if (!authResult.valid) {
         logRequest(req, startTime, 401);
         return addCors(authResult.response!);
       }
-      context = authResult.context;
     }
 
     try {
       // Route handling
-      if (req.method === "POST" && url.pathname === "/auth/login") {
-        const response = await loginHandler(req);
-        logRequest(req, startTime, response.status);
-        return addCors(response);
-      }
-
       if (req.method === "POST" && url.pathname === "/extract-resume") {
         const response = await resumeExtractHandler(req);
         logRequest(req, startTime, response.status);
@@ -184,21 +156,6 @@ const server = serve({
         return addCors(response);
       }
 
-      if (req.method === "POST" && url.pathname === "/extract-jd-streaming") {
-        const response = await jdExtractorStreamingHandler(req);
-        logRequest(req, startTime, response.status);
-        // Special handling for SSE: no cors helper if it messes up streams, 
-        // but addCors just wraps headers, so it should be fine if headers are preserved.
-        // Actually addCors creates a NEW Response with body, which works for streams too in standard Fetch API.
-        return addCors(response);
-      }
-
-      if (req.method === "POST" && url.pathname === "/validate-jd") {
-        const response = await jdValidateHandler(req);
-        logRequest(req, startTime, response.status);
-        return addCors(response);
-      }
-
       if (req.method === "POST" && url.pathname === "/generate-mcq") {
         const response = await mcqGenerateHandler(req);
         logRequest(req, startTime, response.status);
@@ -211,34 +168,8 @@ const server = serve({
         return addCors(response);
       }
 
-
-
-
-
-
-
-
-
-      if (req.method === "POST" && url.pathname === "/copilot/chat") {
-        const response = await copilotChatHandler(req, context);
-        logRequest(req, startTime, response.status);
-        return addCors(response);
-      }
-
       if (req.method === "POST" && url.pathname === "/match") {
-        const response = await jobMatchHandler(req, context);
-        logRequest(req, startTime, response.status);
-        return addCors(response);
-      }
-
-      if (req.method === "GET" && url.pathname === "/job-status") {
-        const response = await jobStatusHandler(req, context);
-        logRequest(req, startTime, response.status);
-        return addCors(response);
-      }
-
-      if (req.method === "GET" && url.pathname === "/analytics") {
-        const response = await analyticsHandler(req, context);
+        const response = await jobMatchHandler(req);
         logRequest(req, startTime, response.status);
         return addCors(response);
       }
@@ -255,70 +186,33 @@ const server = serve({
         return addCors(response);
       }
 
-
-
       if (req.method === "POST" && url.pathname === "/match-multiple") {
         const response = await multipleJobMatchHandler(req);
         logRequest(req, startTime, response.status);
         return addCors(response);
       }
 
-
+      if (req.method === "POST" && url.pathname === "/extract-jd-streaming") {
+        const response = await jdExtractorStreamingHandler(req);
+        logRequest(req, startTime, response.status);
+        return addCors(response);
+      }
 
       if (req.method === "POST" && url.pathname === "/query-mongo") {
-        const response = await mongoNLQueryHandler(req, context);
+        const response = await mongoNLQueryHandler(req);
         logRequest(req, startTime, response.status);
         return addCors(response);
       }
 
       if (req.method === "GET" && url.pathname === "/mongo-info") {
-        const response = await mongoDatabaseInfoHandler(req, context);
+        const response = await mongoDatabaseInfoHandler(req);
         logRequest(req, startTime, response.status);
         return addCors(response);
       }
 
-
-
-      // Interview Scheduling Routes
-      if (req.method === "GET" && url.pathname === "/interviews") {
-        const response = await listInterviewsHandler(req, context);
-        logRequest(req, startTime, response.status);
-        return addCors(response);
-      }
-
-      if (req.method === "POST" && url.pathname === "/interviews/schedule") {
-        const response = await scheduleInterviewHandler(req, context);
-        logRequest(req, startTime, response.status);
-        return addCors(response);
-      }
-
-      if (req.method === "POST" && url.pathname === "/interviews/suggest-times") {
-        const response = await suggestTimesHandler(req, context);
-        logRequest(req, startTime, response.status);
-        return addCors(response);
-      }
-
-      if (req.method === "POST" && url.pathname === "/interviews/cancel") {
-        const response = await cancelInterviewHandler(req, context);
-        logRequest(req, startTime, response.status);
-        return addCors(response);
-      }
-
-      if (req.method === "POST" && url.pathname === "/interviews/reschedule") {
-        const response = await rescheduleInterviewHandler(req, context);
-        logRequest(req, startTime, response.status);
-        return addCors(response);
-      }
-
-      // Calendar Sync Routes
-      if (req.method === "GET" && url.pathname === "/calendar/status") {
-        const response = await getCalendarStatusHandler(req, context);
-        logRequest(req, startTime, response.status);
-        return addCors(response);
-      }
-
-      if (req.method === "POST" && url.pathname === "/calendar/connect") {
-        const response = await connectCalendarHandler(req, context);
+      // Added JD validation route
+      if (req.method === "POST" && url.pathname === "/validate-jd") {
+        const response = await jdValidateHandler(req);
         logRequest(req, startTime, response.status);
         return addCors(response);
       }
@@ -332,31 +226,6 @@ const server = serve({
 
       if (req.method === "POST" && url.pathname === "/assess-batch") {
         const response = await recruiterBatchAssessHandler(req);
-        logRequest(req, startTime, response.status);
-        return addCors(response);
-      }
-
-      // Scorecard Routes
-      if (req.method === "POST" && url.pathname === "/scorecards") {
-        const response = await submitScorecardHandler(req, context);
-        logRequest(req, startTime, response.status);
-        return addCors(response);
-      }
-
-      if (req.method === "GET" && url.pathname === "/scorecards") {
-        const response = await getScorecardHandler(req, context);
-        logRequest(req, startTime, response.status);
-        return addCors(response);
-      }
-
-      if (req.method === "GET" && url.pathname === "/scorecards/candidate") {
-        const response = await getCandidateScorecardsHandler(req, context);
-        logRequest(req, startTime, response.status);
-        return addCors(response);
-      }
-
-      if (req.method === "GET" && url.pathname === "/scorecards/synthesis") {
-        const response = await synthesizeScorecardsHandler(req, context);
         logRequest(req, startTime, response.status);
         return addCors(response);
       }
@@ -419,12 +288,3 @@ const server = serve({
 });
 
 console.log(`HR Tools server running at http://localhost:${server.port}`);
-
-// Background Job: Process Interview Reminders every minute
-setInterval(async () => {
-  try {
-    await InterviewService.processPendingReminders();
-  } catch (error) {
-    console.error('[BackgroundJob] Failed to process reminders:', error);
-  }
-}, 60 * 1000); // 1 minute interval

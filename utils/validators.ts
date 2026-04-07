@@ -13,7 +13,7 @@ export interface FileValidationOptions {
 
 export const DEFAULT_FILE_OPTIONS: FileValidationOptions = {
   maxSize: 50 * 1024 * 1024, // 50MB
-  allowedExtensions: ['.pdf'],
+  allowedExtensions: ['.pdf', '.txt', '.docx'],
   minSize: 100 // 100 bytes minimum
 };
 

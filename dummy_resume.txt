@@ -1,0 +1,23 @@
+John Doe
+Senior Software Engineer
+Email: john.doe@example.com
+Phone: 123-456-7890
+
+Summary:
+Experienced software engineer with 5 years of experience in DevOps and Cloud Infrastructure.
+
+Experience:
+DevOps Engineer at CloudCorp (2021-Present)
+- Managed AWS infrastructure using Terraform and Kubernetes.
+- Implemented CI/CD pipelines using Jenkins and GitHub Actions.
+- Reduced deployment time by 40%.
+
+Systems Administrator at TechSol (2019-2021)
+- Administered Linux servers and managed backups.
+- Automating tasks using Python and Bash scripts.
+
+Skills:
+AWS, Kubernetes, Docker, Terraform, Jenkins, Python, Bash, Linux, Git.
+
+Education:
+B.Tech in Computer Science, University of Technology (2015-2019)

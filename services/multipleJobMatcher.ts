@@ -5,12 +5,14 @@ import { getLLMCache, setLLMCache } from "../utils/llmCache";
 import { createHash } from "crypto";
 import { createLogger } from "../utils/logger";
 import { processMatrix, processBatch } from "../utils/batchProcessor";
+import { getPrompt, hydratePrompt } from "./promptRegistry";
 
 export interface MultipleMatchInput {
   jdFiles: File[];
   resumeFiles: File[];
   jdUrls?: string[];  // Optional: URLs for JD files
   resumeUrls?: string[];  // Optional: URLs for resume files
+  jdDataList?: JobDescriptionData[]; // Optional: Pre-extracted JD data
 }
 
 export interface MultipleMatchResult {
@@ -75,13 +77,13 @@ async function getCachedExtraction(fileBuffer: Buffer, fileName: string, type: '
     // Create a hash of the file content for cache key
     const fileHash = createHash('md5').update(fileBuffer).digest('hex');
     const cacheKey = `${type}_extract_${fileHash}_${fileName}`;
-    
+
     const cached = await getLLMCache(cacheKey);
     if (cached) {
       console.log(`[MultipleJobMatcher] Using cached ${type} extraction for ${fileName}`);
       return cached as JobDescriptionData | ResumeData;
     }
-    
+
     return null;
   } catch (error) {
     console.error(`[MultipleJobMatcher] Error getting cached extraction:`, error);
@@ -93,7 +95,7 @@ async function setCachedExtraction(fileBuffer: Buffer, fileName: string, type: '
   try {
     const fileHash = createHash('md5').update(fileBuffer).digest('hex');
     const cacheKey = `${type}_extract_${fileHash}_${fileName}`;
-    
+
     await setLLMCache(cacheKey, data, EXTRACTION_CACHE_TTL);
     console.log(`[MultipleJobMatcher] Cached ${type} extraction for ${fileName}`);
   } catch (error) {
@@ -104,16 +106,16 @@ async function setCachedExtraction(fileBuffer: Buffer, fileName: string, type: '
 async function extractWithCache(fileBuffer: Buffer, fileName: string, type: 'jd' | 'resume'): Promise<JobDescriptionData | ResumeData> {
   try {
     console.log(`[extractWithCache] Starting extraction for ${type}: ${fileName}`);
-    
+
     // Try to get from cache first
     const cached = await getCachedExtraction(fileBuffer, fileName, type);
     if (cached) {
       console.log(`[extractWithCache] Using cached data for ${fileName}`);
       return cached;
     }
-    
+
     console.log(`[extractWithCache] No cache found, extracting fresh for ${fileName}`);
-    
+
     // Extract data
     let extractedData: JobDescriptionData | ResumeData;
     if (type === 'jd') {
@@ -121,7 +123,7 @@ async function extractWithCache(fileBuffer: Buffer, fileName: string, type: 'jd'
     } else {
       extractedData = await extractResumeData(fileBuffer);
     }
-    
+
     console.log(`[extractWithCache] Extraction complete for ${fileName}`);
     console.log(`[extractWithCache] Data preview:`, {
       type,
@@ -130,10 +132,10 @@ async function extractWithCache(fileBuffer: Buffer, fileName: string, type: 'jd'
       hasTitle: type === 'jd' ? !!(extractedData as JobDescriptionData).title : undefined,
       hasEmail: type === 'resume' ? !!(extractedData as ResumeData).email : undefined
     });
-    
+
     // Cache the extracted data
     await setCachedExtraction(fileBuffer, fileName, type, extractedData);
-    
+
     return extractedData;
   } catch (error) {
     console.error(`[extractWithCache] ERROR extracting ${type} from ${fileName}:`, error);
@@ -141,72 +143,20 @@ async function extractWithCache(fileBuffer: Buffer, fileName: string, type: 'jd'
   }
 }
 
-const MULTIPLE_MATCHING_PROMPT = `You are an expert HR consultant specializing in job-resume matching analysis.
-Analyze the provided job description and resume, focusing specifically on ROLE RELEVANCE, SKILLSET MATCHING, and EXPERIENCE QUALITY.
-
-CRITICAL EVALUATION CRITERIA:
-1. Role Relevance: How well does the candidate's background align with the job role?
-2. Technical Skills Match: What percentage of required technical skills does the candidate possess?
-3. Experience Level Alignment: Does the candidate have appropriate experience for the role level?
-4. Domain Expertise: Does the candidate have relevant industry/domain experience?
-5. Recent Experience Quality: Focus on the candidate's most recent company experience and its relevance
-6. Experience Threshold Compliance: Does the candidate meet the minimum required years of experience?
-
-SCORING GUIDELINES:
-- Only provide matches with score >= 60 (below 60 = irrelevant)
-- Score 60-70: Basic relevance with some skill gaps
-- Score 70-85: Good match with minor gaps
-- Score 85-100: Excellent match, highly relevant
-
-EXPERIENCE EVALUATION FOCUS:
-- Pay special attention to the candidate's most recent work experience
-- Evaluate if the required years of domain experience are met or exceeded
-- If the job requires X years of experience, candidates MUST have at least X years
-- Recent relevant experience should be weighted more heavily than older experience
-- For domain-specific skills (e.g., Python), only count experience if it's in the relevant domain
-
-Return a JSON response with this structure:
-{
-  "matchScore": <number between 0-100>,
-  "relevantMatch": <boolean - true only if score >= 60>,
-  "roleAlignment": {
-    "score": <number 0-100>,
-    "assessment": "<detailed role relevance assessment>"
-  },
-  "skillsetMatch": {
-    "technicalSkillsMatch": <percentage 0-100>,
-    "matchedSkills": ["skill1", "skill2"],
-    "criticalMissingSkills": ["skill3", "skill4"],
-    "skillGapSeverity": "<low/medium/high>"
-  },
-  "experienceAlignment": {
-    "levelMatch": "<junior/mid/senior>",
-    "yearsMatch": "<assessment>",
-    "relevantExperience": "<assessment>",
-    "domainExperienceMatch": "<evaluation of domain experience requirements>",
-    "recentExperienceMatch": "<evaluation of recent company experience relevance>"
-  },
-  "strengths": ["specific strength1", "specific strength2"],
-  "recommendations": ["specific recommendation1", "specific recommendation2"],
-  "rejectionReason": "<reason if not relevant, null if relevant>"
-}
-
-BE STRICT: Only flag as relevantMatch=true if the candidate genuinely fits the role and has meaningful skill overlap. Pay special attention to experience thresholds - if a job requires X years and the candidate has less than X years, this should significantly impact the score. For domain-specific skills, only count experience if it's in the relevant domain.`;
-
 async function performSingleMatch(jdData: JobDescriptionData, resumeData: ResumeData): Promise<any> {
   try {
     // Create cache key for this specific match
     const jdHash = createHash('md5').update(JSON.stringify(jdData)).digest('hex');
     const resumeHash = createHash('md5').update(JSON.stringify(resumeData)).digest('hex');
     const cacheKey = `match_${jdHash}_${resumeHash}`;
-    
+
     // Try to get cached match result
     const cached = await getLLMCache(cacheKey);
     if (cached) {
       console.log('[MultipleJobMatcher] Using cached match result');
       return cached;
     }
-    
+
     // Format the experience data for better analysis
     let formattedExperience = 'Not specified';
     if (Array.isArray(resumeData.experience) && resumeData.experience.length > 0) {
@@ -223,8 +173,8 @@ async function performSingleMatch(jdData: JobDescriptionData, resumeData: Resume
         formattedExperience = resumeData.experience.join('\n');
       }
     }
-    
-    const prompt = `
+
+    const promptData = `
 Job Description:
 Title: ${jdData.title}
 Company: ${jdData.company}
@@ -261,14 +211,20 @@ BE STRICT IN YOUR EVALUATION:
 - For domain-specific skills (e.g., Python), only count experience if it's in the relevant domain
 - If a job requires X years of domain experience, candidates MUST meet or exceed that threshold
 `;
-    
+
+    // Get prompt config
+    const promptConfig = getPrompt('JOB_MATCHING_V1');
+    const finalPrompt = hydratePrompt(promptConfig.template, {
+      input_data: promptData
+    });
+
     const response = await groqChatCompletion(
-      MULTIPLE_MATCHING_PROMPT,
-      prompt,
-      0.3,
-      1024
+      "You are an expert HR consultant specializing in job-resume matching analysis.",
+      finalPrompt,
+      promptConfig.modelConfig.temperature,
+      promptConfig.modelConfig.maxTokens
     );
-    
+
     // Parse the response
     let result;
     try {
@@ -283,15 +239,15 @@ BE STRICT IN YOUR EVALUATION:
       if (cleanedResponse.endsWith('```')) {
         cleanedResponse = cleanedResponse.substring(0, cleanedResponse.length - 3);
       }
-      
+
       // Find JSON object
       const jsonStart = cleanedResponse.indexOf('{');
       const jsonEnd = cleanedResponse.lastIndexOf('}') + 1;
-      
+
       if (jsonStart !== -1 && jsonEnd > jsonStart) {
         cleanedResponse = cleanedResponse.substring(jsonStart, jsonEnd);
       }
-      
+
       result = JSON.parse(cleanedResponse);
     } catch (parseError) {
       console.error('[MultipleJobMatcher] Failed to parse AI response:', response);
@@ -306,9 +262,9 @@ BE STRICT IN YOUR EVALUATION:
           criticalMissingSkills: [],
           skillGapSeverity: "high"
         },
-        experienceAlignment: { 
-          levelMatch: "unknown", 
-          yearsMatch: "unknown", 
+        experienceAlignment: {
+          levelMatch: "unknown",
+          yearsMatch: "unknown",
           relevantExperience: "unknown",
           domainExperienceMatch: "unknown",
           recentExperienceMatch: "unknown"
@@ -318,10 +274,10 @@ BE STRICT IN YOUR EVALUATION:
         rejectionReason: "AI response parsing failed"
       };
     }
-    
+
     // Cache the result
     await setLLMCache(cacheKey, result, 1000 * 60 * 60 * 12); // 12 hours
-    
+
     return result;
   } catch (error) {
     console.error('[MultipleJobMatcher] Error in performSingleMatch:', error);
@@ -334,74 +290,99 @@ export async function matchMultipleJDsWithMultipleResumes(
   requestId?: string
 ): Promise<MultipleMatchResult[]> {
   const logger = createLogger(requestId, 'MultipleJobMatcher');
-  
+
   try {
-    const totalCombinations = input.jdFiles.length * input.resumeFiles.length;
+    const jdFileCount = input.jdFiles.length;
+    const jdDataCount = input.jdDataList?.length || 0;
+    const totalJDs = jdFileCount + jdDataCount;
+    const totalCombinations = totalJDs * input.resumeFiles.length;
+
     logger.info('Starting multiple job matching', {
-      jdCount: input.jdFiles.length,
+      jdCount: totalJDs,
+      jdFileCount,
+      jdDataCount,
       resumeCount: input.resumeFiles.length,
       totalCombinations
     });
-    
+
     // Extract all JDs with caching - using controlled concurrency to avoid race conditions
     const extractionLogger = logger.child('Extraction');
-    extractionLogger.info('Extracting job descriptions', { count: input.jdFiles.length });
-    
-    // Process JD extractions with controlled concurrency (1 at a time to avoid race conditions)
-    const jdExtractionResults = await processBatch(
-      input.jdFiles,
-      async (file, index) => {
-        const buffer = Buffer.from(await file.arrayBuffer());
-        extractionLogger.debug(`Processing JD ${index + 1}/${input.jdFiles.length}`, { fileName: file.name, bufferSize: buffer.length });
-        
-        const data = await extractWithCache(buffer, file.name, 'jd') as JobDescriptionData;
-        
-        // Validate extraction result
-        const isEmpty = !data.title && !data.company && (!data.skills || data.skills.length === 0);
-        if (isEmpty) {
-          extractionLogger.warn('⚠️  JD extraction returned EMPTY data!', {
-            index,
-            fileName: file.name,
-            bufferSize: buffer.length,
-            extractedData: data
-          });
-        } else {
-          extractionLogger.debug('✓ JD extracted successfully', {
-            index,
-            fileName: file.name,
-            title: data.title,
-            company: data.company,
-            skillsCount: data.skills?.length || 0
-          });
-        }
-        
-        return { index, data, fileName: file.name };
-      },
-      {
-        concurrency: 1, // Process one at a time to avoid race conditions
-        onProgress: (processed, total) => {
-          extractionLogger.info('JD extraction progress', { processed, total });
+    const jdExtractions: Array<{ index: number; data: JobDescriptionData; fileName: string }> = [];
+    const jdErrors: any[] = [];
+
+    // 1. Process JD Files
+    if (input.jdFiles.length > 0) {
+      extractionLogger.info('Extracting job descriptions from files', { count: input.jdFiles.length });
+
+      const jdFileResults = await processBatch(
+        input.jdFiles,
+        async (file, index) => {
+          const buffer = Buffer.from(await file.arrayBuffer());
+          extractionLogger.debug(`Processing JD ${index + 1}/${input.jdFiles.length}`, { fileName: file.name, bufferSize: buffer.length });
+
+          const data = await extractWithCache(buffer, file.name, 'jd') as JobDescriptionData;
+
+          // Validate extraction result
+          const isEmpty = !data.title && !data.company && (!data.skills || data.skills.length === 0);
+          if (isEmpty) {
+            extractionLogger.warn('⚠️  JD extraction returned EMPTY data!', {
+              index,
+              fileName: file.name,
+              bufferSize: buffer.length,
+              extractedData: data
+            });
+          } else {
+            extractionLogger.debug('✓ JD extracted successfully', {
+              index,
+              fileName: file.name,
+              title: data.title,
+              company: data.company,
+              skillsCount: data.skills?.length || 0
+            });
+          }
+
+          return { index, data, fileName: file.name };
         },
-        onError: (error, item, index) => {
-          extractionLogger.error('JD extraction failed', error, { fileName: (item as File).name, index });
+        {
+          concurrency: 1, // Process one at a time to avoid race conditions
+          onProgress: (processed, total) => {
+            extractionLogger.info('JD extraction progress', { processed, total });
+          },
+          onError: (error, item, index) => {
+            extractionLogger.error('JD extraction failed', error, { fileName: (item as File).name, index });
+          }
         }
-      }
-    );
-    
-    const jdExtractions = jdExtractionResults.success;
-    
+      );
+
+      jdExtractions.push(...jdFileResults.success);
+      jdErrors.push(...jdFileResults.errors);
+    }
+
+    // 2. Process pre-extracted JD Data
+    if (input.jdDataList && input.jdDataList.length > 0) {
+      extractionLogger.info('Processing pre-extracted job descriptions', { count: input.jdDataList.length });
+
+      input.jdDataList.forEach((data, i) => {
+        jdExtractions.push({
+          index: jdFileCount + i, // Offset index by file count
+          data: data,
+          fileName: `Job Description ${i + 1}` // Synthetic filename
+        });
+      });
+    }
+
     // Extract all resumes with caching - using controlled concurrency to avoid race conditions
     extractionLogger.info('Extracting resumes', { count: input.resumeFiles.length });
-    
+
     // Process resume extractions with controlled concurrency (1 at a time to avoid race conditions)
     const resumeExtractionResults = await processBatch(
       input.resumeFiles,
       async (file, index) => {
         const buffer = Buffer.from(await file.arrayBuffer());
         extractionLogger.debug(`Processing resume ${index + 1}/${input.resumeFiles.length}`, { fileName: file.name, bufferSize: buffer.length });
-        
+
         const data = await extractWithCache(buffer, file.name, 'resume') as ResumeData;
-        
+
         // Validate extraction result
         const isEmpty = !data.name && !data.email && (!data.skills || data.skills.length === 0);
         if (isEmpty) {
@@ -420,7 +401,7 @@ export async function matchMultipleJDsWithMultipleResumes(
             skillsCount: data.skills?.length || 0
           });
         }
-        
+
         return { index, data, fileName: file.name };
       },
       {
@@ -433,14 +414,14 @@ export async function matchMultipleJDsWithMultipleResumes(
         }
       }
     );
-    
+
     const resumeExtractions = resumeExtractionResults.success;
-    
+
     // LOG EXTRACTION ERRORS IF ANY
-    if (jdExtractionResults.errors.length > 0) {
+    if (jdErrors.length > 0) {
       extractionLogger.error('⚠️  JD EXTRACTION ERRORS', undefined, {
-        errorCount: jdExtractionResults.errors.length,
-        errors: jdExtractionResults.errors.map(e => ({
+        errorCount: jdErrors.length,
+        errors: jdErrors.map(e => ({
           index: e.index,
           fileName: (e.item as File).name,
           error: e.error.message,
@@ -448,7 +429,7 @@ export async function matchMultipleJDsWithMultipleResumes(
         }))
       });
     }
-    
+
     if (resumeExtractionResults.errors.length > 0) {
       extractionLogger.error('⚠️  RESUME EXTRACTION ERRORS', undefined, {
         errorCount: resumeExtractionResults.errors.length,
@@ -460,27 +441,27 @@ export async function matchMultipleJDsWithMultipleResumes(
         }))
       });
     }
-    
+
     extractionLogger.info('Extraction completed', {
       jdCount: jdExtractions.length,
-      jdErrors: jdExtractionResults.errors.length,
+      jdErrors: jdErrors.length,
       resumeCount: resumeExtractions.length,
       resumeErrors: resumeExtractionResults.errors.length
     });
-    
+
     // Check if we have any successful extractions
     if (jdExtractions.length === 0) {
-      throw new Error(`All JD extractions failed! ${jdExtractionResults.errors.length} errors occurred.`);
+      throw new Error(`All JD extractions failed (or none provided)! ${jdErrors.length} errors occurred.`);
     }
-    
+
     if (resumeExtractions.length === 0) {
       throw new Error(`All resume extractions failed! ${resumeExtractionResults.errors.length} errors occurred.`);
     }
-    
+
     // Perform matching for all combinations with controlled concurrency
     const matchLogger = logger.child('Matching');
     let processedCount = 0;
-    
+
     const matchProcessor = async (
       jdExtraction: typeof jdExtractions[0],
       resumeExtraction: typeof resumeExtractions[0],
@@ -493,9 +474,9 @@ export async function matchMultipleJDsWithMultipleResumes(
         jdIndex,
         resumeIndex
       });
-      
+
       const matchAnalysis = await performSingleMatch(jdExtraction.data, resumeExtraction.data);
-      
+
       // Generate a summary explaining the matching criteria evaluation
       let summary = '';
       if (matchAnalysis.roleAlignment && matchAnalysis.skillsetMatch && matchAnalysis.experienceAlignment) {
@@ -509,7 +490,7 @@ export async function matchMultipleJDsWithMultipleResumes(
         summary = `This match has a score of ${matchAnalysis.matchScore || 0}%. `;
         summary += `Detailed criteria evaluation is not available.`;
       }
-      
+
       // Return ALL matches regardless of score (no filtering)
       const matchResult: MultipleMatchResult = {
         jdIndex: jdExtraction.index,
@@ -539,7 +520,7 @@ export async function matchMultipleJDsWithMultipleResumes(
           requiredDomainExperienceYears: jdExtraction.data.requiredDomainExperienceYears || 0
         }
       };
-      
+
       matchLogger.debug('Match result', {
         candidateName: matchResult.candidateName,
         jdTitle: matchResult.jdTitle,
@@ -547,10 +528,10 @@ export async function matchMultipleJDsWithMultipleResumes(
         isRelevant: matchAnalysis.relevantMatch,
         rejectionReason: matchAnalysis.rejectionReason
       });
-      
+
       return matchResult;
     };
-    
+
     // Process matrix with controlled concurrency (3 parallel operations)
     const batchResult = await processMatrix(
       jdExtractions,
@@ -575,11 +556,11 @@ export async function matchMultipleJDsWithMultipleResumes(
         }
       }
     );
-    
+
     // Get all match results (no filtering) and remove row/col index metadata
     const allMatchResults = batchResult.success
       .map(({ rowIndex, colIndex, ...matchResult }) => matchResult);
-    
+
     // Debug logging
     if (allMatchResults.length === 0) {
       logger.error('No match results generated!', undefined, {
@@ -592,16 +573,16 @@ export async function matchMultipleJDsWithMultipleResumes(
         }))
       });
     }
-    
+
     logger.info('Matching completed', {
       totalProcessed: batchResult.totalProcessed,
       totalMatches: allMatchResults.length,
       errors: batchResult.totalErrors
     });
-    
+
     // Sort results by match score (highest first)
     allMatchResults.sort((a, b) => b.matchScore - a.matchScore);
-    
+
     return allMatchResults;
   } catch (error) {
     logger.error('Multiple job matching failed', error instanceof Error ? error : new Error(String(error)));

@@ -77,6 +77,42 @@ bun run dev
 
 The server will be available at `http://localhost:3001`
 
+### Local Development with Docker (Redis + MongoDB)
+
+For local development, you can run Redis and MongoDB using Docker:
+
+```bash
+# Start Redis and MongoDB containers
+docker-compose up -d
+
+# Verify containers are running
+docker-compose ps
+
+# View logs
+docker-compose logs -f
+```
+
+**Services Started:**
+
+| Service | Port | Description |
+|---------|------|-------------|
+| MongoDB | 27017 | Database |
+| Redis | 6379 | Cache |
+| Mongo Express | 8082 | MongoDB UI (optional) |
+| Redis Commander | 8081 | Redis UI (optional) |
+
+**Connection URLs (Local Docker):**
+```
+REDIS_URL=redis://localhost:6379
+MONGODB_URL=mongodb://skillmatrix_user:skillmatrix_pass@localhost:27017/skillmatrix
+```
+
+**Stopping containers:**
+```bash
+docker-compose down          # Stop containers
+docker-compose down -v       # Stop and remove volumes (clears data)
+```
+
 ## API Endpoints
 
 ### Resume Extraction
@@ -457,12 +493,268 @@ ENABLE_PROGRESS_LOGGING=true
 - ✅ **Included**: Senior Developer JD + Mid-level Developer Resume (Score: 72)
 - ❌ **Filtered**: Technical Writer JD + Software Engineer Resume (Score: 45)
 
+---
+
+## 🤖 AI Recruiter Copilot (NEW)
+
+The AI Recruiter Copilot transforms the system from an autonomous scoring engine into a **recruiter decision-support system**. It prioritizes clarity, evidence, and explanation over opaque scores.
+
+### Philosophy
+
+- **Clarity over cleverness** - Plain language explanations
+- **Evidence over claims** - Every conclusion traced to data
+- **Explanation over scoring** - No hidden reasoning
+- **Defensible decisions** - Support recruiter accountability
+
+### Single Candidate Assessment
+```
+POST /assess-candidate
+```
+
+Generate an evidence-based assessment for a single candidate against a job description.
+
+**Structured Input (Preferred):**
+```json
+{
+  "job_description": {
+    "title": "Senior Backend Engineer",
+    "company": "TechCorp",
+    "core_skills": [
+      { "skill": "Python", "weight": "critical", "mandatory": true },
+      { "skill": "PostgreSQL", "weight": "important", "mandatory": true },
+      { "skill": "Docker", "weight": "nice_to_have", "mandatory": false }
+    ],
+    "experience_expectations": {
+      "min_years": 5,
+      "domain_specific": "Backend development in fintech"
+    },
+    "role_context": "Building high-throughput payment processing systems"
+  },
+  "candidate_profile": {
+    "name": "Jane Smith",
+    "email": "jane@example.com",
+    "extracted_skills": ["Python", "Django", "PostgreSQL", "Redis"],
+    "skill_evidence": [
+      {
+        "skill": "Python",
+        "evidence_type": "production",
+        "context": "Led development of payment gateway",
+        "project": "PaymentHub",
+        "outcome": "Processed $10M daily transactions"
+      },
+      {
+        "skill": "PostgreSQL",
+        "evidence_type": "demonstrated",
+        "context": "Designed database schemas for financial data"
+      }
+    ],
+    "experience_estimate": {
+      "total_years": 6,
+      "relevant_years": 4
+    },
+    "recent_role": {
+      "title": "Backend Engineer",
+      "company": "FinTech Startup",
+      "duration": "2020-Present"
+    },
+    "certifications": ["AWS Solutions Architect"],
+    "gaps": []
+  },
+  "matching_signals": {
+    "experience_alignment": "meets",
+    "role_relevance": "high",
+    "mandatory_skills_met": true
+  }
+}
+```
+
+**Legacy Input (PDF Upload):**
+- Form data with `jd` and `resume` PDF files
+- OR JSON with `jdUrl` and `resumeUrl` URLs
+
+**Response:**
+```json
+{
+  "success": true,
+  "assessment": {
+    "one_line_summary": "Experienced backend engineer with production fintech experience, meets core requirements but lacks Docker expertise.",
+    "fit_assessment": {
+      "overall_fit": "high",
+      "reasoning": "Candidate has 6 years of total experience with 4 years in relevant backend roles. Production experience with Python and PostgreSQL in fintech domain directly aligns with role requirements. Missing Docker experience is noted but classified as nice-to-have."
+    },
+    "strengths": [
+      {
+        "skill": "Python",
+        "evidence_level": "production",
+        "evidence": "Led development of PaymentHub payment gateway processing $10M daily transactions"
+      },
+      {
+        "skill": "PostgreSQL",
+        "evidence_level": "demonstrated",
+        "evidence": "Designed database schemas for financial data at FinTech Startup"
+      }
+    ],
+    "gaps_and_risks": [
+      {
+        "area": "Docker",
+        "risk_level": "low",
+        "explanation": "Skill not found in profile. Classified as nice-to-have, not blocking."
+      }
+    ],
+    "skill_match_breakdown": [
+      {
+        "required_skill": "Python",
+        "candidate_coverage": "strong",
+        "notes": "Production-level experience with measurable outcomes in payment processing"
+      },
+      {
+        "required_skill": "PostgreSQL",
+        "candidate_coverage": "strong",
+        "notes": "Demonstrated experience designing financial database schemas"
+      },
+      {
+        "required_skill": "Docker",
+        "candidate_coverage": "none",
+        "notes": "Skill not listed in profile or evidence"
+      }
+    ],
+    "interview_focus_areas": [
+      {
+        "topic": "System Design at Scale",
+        "why": "Role involves high-throughput systems; verify depth of scaling experience",
+        "sample_probe_question": "Walk me through how you designed the PaymentHub system to handle $10M in daily transactions. What were the bottlenecks and how did you address them?"
+      },
+      {
+        "topic": "Docker/Containerization",
+        "why": "Gap in profile despite being listed as nice-to-have",
+        "sample_probe_question": "Have you worked with containerization in any capacity? How do you typically deploy your applications?"
+      }
+    ],
+    "recruiter_notes": {
+      "override_suggestions": "If Docker expertise is critical for the team, consider whether this gap is trainable within onboarding period. Candidate's fintech production experience may outweigh this gap.",
+      "confidence_level": "high"
+    }
+  }
+}
+```
+
+### Batch Candidate Assessment
+```
+POST /assess-batch
+```
+
+Assess multiple candidates against a single job description in parallel.
+
+**Request:**
+```json
+{
+  "job_description": {
+    "title": "Senior Backend Engineer",
+    "core_skills": [
+      { "skill": "Python", "weight": "critical", "mandatory": true }
+    ],
+    "experience_expectations": { "min_years": 5 }
+  },
+  "candidates": [
+    {
+      "candidate_profile": {
+        "name": "Jane Smith",
+        "extracted_skills": ["Python", "Django"],
+        "skill_evidence": [],
+        "experience_estimate": { "total_years": 6 }
+      },
+      "matching_signals": {
+        "experience_alignment": "meets",
+        "role_relevance": "high",
+        "mandatory_skills_met": true
+      }
+    },
+    {
+      "candidate_profile": {
+        "name": "John Doe",
+        "extracted_skills": ["JavaScript", "React"],
+        "skill_evidence": [],
+        "experience_estimate": { "total_years": 4 }
+      },
+      "matching_signals": {
+        "experience_alignment": "below",
+        "role_relevance": "low",
+        "mandatory_skills_met": false,
+        "missing_mandatory_skills": ["Python"]
+      }
+    }
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "job_title": "Senior Backend Engineer",
+  "total_candidates": 2,
+  "assessments": [
+    {
+      "candidate_name": "Jane Smith",
+      "assessment": {
+        "one_line_summary": "...",
+        "fit_assessment": { "overall_fit": "high", "reasoning": "..." }
+      }
+    },
+    {
+      "candidate_name": "John Doe",
+      "assessment": {
+        "one_line_summary": "...",
+        "fit_assessment": { "overall_fit": "low", "reasoning": "..." }
+      }
+    }
+  ]
+}
+```
+
+### Evidence Levels
+
+| Level | Meaning |
+|-------|---------|
+| `production` | Skill used in live/production systems with measurable outcomes |
+| `demonstrated` | Skill used in projects, interviews, or assessments with context |
+| `claimed` | Skill listed in resume/profile without supporting evidence |
+
+### Fit Levels
+
+| Level | Meaning |
+|-------|---------|
+| `high` | Strong alignment with role requirements; minimal gaps |
+| `medium` | Partial alignment; some gaps but trainable or non-blocking |
+| `low` | Significant gaps in mandatory requirements; high risk |
+
+### Decision Rules
+
+1. Skills with no context are marked `claimed`
+2. Unclear experience duration is stated explicitly
+3. Missing mandatory skills always appear in `gaps_and_risks`
+4. Confidence is never inflated
+
+### Error Response
+
+When evidence is insufficient:
+```json
+{
+  "success": false,
+  "error": "Insufficient structured evidence to support a defensible hiring decision."
+}
+```
+
+---
+
 ## Technology Stack
 
 - **Runtime**: Bun
 - **Language**: TypeScript
 - **AI Models**: Groq (Llama 3), Ollama
 - **PDF Processing**: pdf-parse, pdfjs-dist
+- **Caching**: Redis
+- **Database**: MongoDB
 
 ## License
 
