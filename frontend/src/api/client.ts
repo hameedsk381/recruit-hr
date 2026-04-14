@@ -95,6 +95,17 @@ export const api = {
         return res;
     },
 
+    register: async (email: string, password?: string, tenantId?: string, name?: string) => {
+        return request<{
+            success: boolean;
+            userId: string;
+            error?: string;
+        }>('/auth/register', {
+            method: 'POST',
+            body: { email, password, tenantId, name }
+        });
+    },
+
     // Job Matching (Refactored to Async)
     match: async (resumeFiles: File[], jdData?: any, jdFile?: File) => {
         const payload: any = { resumes: resumeFiles };
@@ -109,9 +120,31 @@ export const api = {
         return request<any>(`/job-status?${query}`);
     },
 
+    cancelBatch: async (batchId: string) => {
+        return request<{ success: boolean; cancelled: boolean }>('/cancel-batch', {
+            method: 'POST',
+            body: { batchId }
+        });
+    },
+
     // Analytics
     getAnalytics: async () => {
         return request<any>('/analytics');
+    },
+
+    getRoiAnalytics: async () => {
+        return request<any>('/analytics/roi');
+    },
+
+    // Privacy & GDPR
+    deleteCandidateData: async (candidateId: string) => {
+        return request<any>(`/privacy/candidate/${candidateId}`, {
+            method: 'DELETE'
+        });
+    },
+
+    getPrivacyNotice: async () => {
+        return request<any>('/dpdp/notice');
     },
 
     // Copilot Chat
@@ -192,6 +225,91 @@ export const api = {
 
     extractJD: async (file: File) => {
         return uploadFiles('/extract-jd', { jobDescription: file });
+    },
+
+    // Recruiter State Persistence
+    getActiveState: async () => {
+        return request<{ success: boolean; state: any }>('/recruiter/active-state');
+    },
+
+    updateCandidate: async (batchId: string, candidateId: string, updates: any) => {
+        return request<{ success: boolean }>('/recruiter/update-candidate', {
+            method: 'POST',
+            body: { batchId, candidateId, ...updates }
+        });
+    },
+
+    getRecruiterHistory: async () => {
+        return request<{ success: boolean; history: any[] }>('/recruiter/history');
+    },
+
+    atsSync: async (data: { batchResultId: string, provider: 'ZOHO' | 'DARWINBOX', externalCandidateId: string }) => {
+        return request<{ success: boolean }>('/ats/sync', {
+            method: 'POST',
+            body: data
+        });
+    },
+
+    // AI Recruiter Copilot Assessments
+    assessCandidate: async (candidateData: any, jdData: any) => {
+        return request<{ success: boolean; assessment: any }>('/assess-candidate', {
+            method: 'POST',
+            body: { candidate: candidateData, jobDescription: jdData }
+        });
+    },
+
+    assessBatch: async (candidates: any[], jdData: any) => {
+        return request<{ success: boolean; results: any[] }>('/assess-batch', {
+            method: 'POST',
+            body: { candidates, jobDescription: jdData }
+        });
+    },
+
+    // High-Volume Batch Processing Queue
+    startBatchProcessing: async (formData: FormData) => {
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch(`${API_BASE_URL}/batch/start`, {
+            method: 'POST',
+            headers: {
+                ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+            },
+            body: formData,
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+    },
+
+    getBatchQueueStatus: async (batchId: string) => {
+        return request<{ success: boolean; status: string; queueStatus: any }>(`/batch/status/${batchId}`);
+    },
+
+    // Advanced Screenings (Voice / Evaluation / MCQ)
+    generateVoiceQuestions: async (jdData: any, context?: string) => {
+        return request<{ success: boolean; questions: any[] }>('/generate-voice-questions', {
+            method: 'POST',
+            body: { jd: typeof jdData === 'string' ? jdData : JSON.stringify(jdData), context }
+        });
+    },
+
+    evaluateTextAnswer: async (question: string, answer: string, jdContext?: string) => {
+        return request<{ success: boolean; evaluation: any }>('/evaluate', {
+            method: 'POST',
+            body: { question, answer, context: jdContext }
+        });
+    },
+
+    evaluateAudioAnswer: async (file: File, question: string, context?: string) => {
+        return uploadFiles('/evaluate-audio', { audio: file }, { question, ...(context && { context }) });
+    },
+
+    generateMcq: async (jdData: any, resumeData?: any) => {
+        return request<{ success: boolean; questions: any[] }>('/generate-mcq', {
+            method: 'POST',
+            body: {
+                jobDescription: typeof jdData === 'string' ? jdData : JSON.stringify(jdData),
+                resume: resumeData ? (typeof resumeData === 'string' ? resumeData : JSON.stringify(resumeData)) : undefined
+            }
+        });
     }
 };
 

@@ -73,6 +73,22 @@ services:
     networks:
       - skillmatrix-network
 
+  # LiteLLM Proxy - Standardizes OpenAI interface for Groq and Ollama
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: skillmatrix-litellm
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./litellm_config.yaml:/app/config.yaml
+    command: [ "--config", "/app/config.yaml" ]
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY:-your-api-key}
+    networks:
+      - skillmatrix-network
+
+
 volumes:
   mongodb_data:
     driver: local

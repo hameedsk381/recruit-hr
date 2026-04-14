@@ -1,4 +1,5 @@
 import { Groq } from 'groq-sdk';
+import { CircuitBreaker, createLLMCircuitBreaker } from './circuitBreaker';
 
 // Parse multiple API keys from environment variable
 const apiKeys = (process.env.GROQ_API_KEYS || process.env.GROQ_API_KEY || '').split(',').map(key => key.trim()).filter(key => key);
@@ -9,6 +10,9 @@ const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 
 // Initialize Groq clients for each API key
 const groqClients = apiKeys.map(apiKey => new Groq({ apiKey }));
+
+// Circuit breaker for API resilience
+const circuitBreaker = createLLMCircuitBreaker();
 
 // Simple in-memory cache for rate limiting
 const rateLimitCache = new Map<string, { count: number; resetTime: number }>();
@@ -82,76 +86,80 @@ export async function groqChatCompletion(
   max_tokens: number = 1024 // Limit tokens to reduce costs and improve speed
 ): Promise<string> {
   console.log(`[GroqClient] Starting API call - User prompt length: ${user.length} chars, Max tokens: ${max_tokens}`);
+  console.log(`[GroqClient] Circuit breaker state: ${circuitBreaker.getState()}`);
   
   let attempts = 0;
   const maxAttempts = Math.max(groqClients.length * 2, 3); // Try each key twice, minimum 3 attempts
   
-  while (attempts < maxAttempts) {
-    try {
-      // Check rate limit before making request
-      if (!checkRateLimit()) {
-        console.log(`[GroqClient] Rate limit exceeded for key ${currentKeyIndex + 1}, waiting...`);
-        await waitForRateLimitReset();
-        continue;
-      }
-      
-      const groq = getCurrentGroqClient();
-      
-      console.log(`[GroqClient] Making API call (attempt ${attempts + 1}/${maxAttempts}) with model: ${GROQ_MODEL}`);
-      
-      const chatCompletion = await groq.chat.completions.create({
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user }
-        ],
-        model: GROQ_MODEL,
-        temperature: temperature,
-        max_tokens: max_tokens,
-      });
-      
-      const responseContent = chatCompletion.choices[0]?.message?.content || '';
-      console.log(`[GroqClient] API call successful - Response length: ${responseContent.length} chars`);
-      
-      if (responseContent.length === 0) {
-        console.warn('[GroqClient] WARNING: API returned empty response!');
-      }
-
-      return responseContent;
-    } catch (error) {
-      attempts++;
-      console.error(`[GroqClient] Attempt ${attempts} failed:`, error);
-      
-      // If we have multiple keys and this might be a rate limit error, rotate and try again
-      if (attempts < maxAttempts && error instanceof Error) {
-        const errorMessage = error.message.toLowerCase();
-        const isRateLimitError = errorMessage.includes('rate limit') || 
-                                errorMessage.includes('quota') || 
-                                errorMessage.includes('too many requests') ||
-                                error.message.includes('429');
-        
-        if (isRateLimitError && groqClients.length > 1) {
-          rotateApiKey();
-          console.log(`[GroqClient] Rate limit error, rotating to API key ${currentKeyIndex + 1}/${groqClients.length}`);
-          
-          // Wait a bit before retrying with new key
-          await new Promise(resolve => setTimeout(resolve, 1000));
+  // Execute through circuit breaker
+  return circuitBreaker.execute(async () => {
+    while (attempts < maxAttempts) {
+      try {
+        // Check rate limit before making request
+        if (!checkRateLimit()) {
+          console.log(`[GroqClient] Rate limit exceeded for key ${currentKeyIndex + 1}, waiting...`);
+          await waitForRateLimitReset();
           continue;
         }
         
-        // For other errors, wait before retrying
-        if (attempts < maxAttempts - 1) {
-          const waitTime = Math.min(1000 * Math.pow(2, attempts), 10000); // Exponential backoff, max 10 seconds
-          console.log(`[GroqClient] Waiting ${waitTime}ms before retrying...`);
-          await new Promise(resolve => setTimeout(resolve, waitTime));
+        const groq = getCurrentGroqClient();
+        
+        console.log(`[GroqClient] Making API call (attempt ${attempts + 1}/${maxAttempts}) with model: ${GROQ_MODEL}`);
+        
+        const chatCompletion = await groq.chat.completions.create({
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: user }
+          ],
+          model: GROQ_MODEL,
+          temperature: temperature,
+          max_tokens: max_tokens,
+        });
+        
+        const responseContent = chatCompletion.choices[0]?.message?.content || '';
+        console.log(`[GroqClient] API call successful - Response length: ${responseContent.length} chars`);
+        
+        if (responseContent.length === 0) {
+          console.warn('[GroqClient] WARNING: API returned empty response!');
+        }
+
+        return responseContent;
+      } catch (error) {
+        attempts++;
+        console.error(`[GroqClient] Attempt ${attempts} failed:`, error);
+        
+        // If we have multiple keys and this might be a rate limit error, rotate and try again
+        if (attempts < maxAttempts && error instanceof Error) {
+          const errorMessage = error.message.toLowerCase();
+          const isRateLimitError = errorMessage.includes('rate limit') || 
+                                  errorMessage.includes('quota') || 
+                                  errorMessage.includes('too many requests') ||
+                                  error.message.includes('429');
+          
+          if (isRateLimitError && groqClients.length > 1) {
+            rotateApiKey();
+            console.log(`[GroqClient] Rate limit error, rotating to API key ${currentKeyIndex + 1}/${groqClients.length}`);
+            
+            // Wait a bit before retrying with new key
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            continue;
+          }
+          
+          // For other errors, wait before retrying
+          if (attempts < maxAttempts - 1) {
+            const waitTime = Math.min(1000 * Math.pow(2, attempts), 10000); // Exponential backoff, max 10 seconds
+            console.log(`[GroqClient] Waiting ${waitTime}ms before retrying...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+          }
+        }
+        
+        // If we've exhausted all attempts, throw the error
+        if (attempts >= maxAttempts) {
+          throw new Error(`Failed to get response from Groq after ${maxAttempts} attempts: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       }
-      
-      // If we've exhausted all attempts, throw the error
-      if (attempts >= maxAttempts) {
-        throw new Error(`Failed to get response from Groq after ${maxAttempts} attempts: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
     }
-  }
-  
-  throw new Error('Failed to get response from Groq after all attempts');
+    
+    throw new Error('Failed to get response from Groq after all attempts');
+  });
 }

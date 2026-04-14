@@ -1,8 +1,8 @@
-# talentacquisation.ai - Frontend Architecture
+# reckuit.ai - Frontend Architecture
 
 ## Product Overview
 
-**Product:** talentacquisation.ai  
+**Product:** reckuit.ai  
 **Audience:** Professional recruiters hiring under time pressure  
 **Goal:** Reduce cognitive load and enable fast, defensible shortlisting
 

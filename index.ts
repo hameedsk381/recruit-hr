@@ -1,7 +1,7 @@
 import { serve } from "bun";
 import { config } from "dotenv";
 import { resumeExtractHandler } from "./routes/resumeExtract";
-import { jobMatchHandler } from "./routes/jobMatch";
+import { jobMatchHandler, cancelBatchHandler } from "./routes/jobMatch";
 import { answerEvaluateHandler } from "./routes/answerEvaluate";
 import { multipleJobMatchHandler } from "./routes/multipleJobMatch";
 import { mongoNLQueryHandler, mongoDatabaseInfoHandler } from "./routes/mongoNLQuery";
@@ -21,7 +21,7 @@ import { getCalendarStatusHandler, connectCalendarHandler } from "./routes/calen
 import { initializeRedisClient } from "./utils/redisClient";
 import { initializeMongoClient } from "./utils/mongoClient";
 import { validateRequestAuth } from "./middleware/authMiddleware";
-import { loginHandler } from "./routes/auth";
+import { loginHandler, registerHandler } from "./routes/auth";
 import {
   submitScorecardHandler,
   getScorecardHandler,
@@ -35,6 +35,17 @@ import { jdValidateHandler } from "./routes/jdValidate";
 import { mcqGenerateHandler } from "./routes/mcqGenerate";
 import { voiceInterviewHandler } from "./routes/voiceInterview";
 import { audioEvaluateHandler } from "./routes/audioEvaluate";
+import { deleteCandidateGdprHandler, runRetentionPolicyHandler } from "./routes/privacy";
+import { PrivacyService } from "./services/privacyService";
+import { getDpdpNoticeHandler, fileGrievanceHandler, consentManagerWebhookHandler } from "./routes/dpdpCompliance";
+import { bulkProcessUploadHandler, getBatchStatusHandler } from "./routes/batchProcessing";
+import { getRoiAnalyticsHandler } from "./routes/roiAnalytics";
+import { atsSyncHandler } from "./routes/atsSync";
+import { 
+  getActiveStateHandler, 
+  updateCandidateHandler, 
+  getRecruiterHistoryHandler 
+} from "./routes/recruiterState";
 
 // Load environment variables
 config();
@@ -144,7 +155,8 @@ const server = serve({
       "/",
       "/health",
       "/mongo-info",
-      "/auth/login"
+      "/auth/login",
+      "/auth/register"
     ];
 
     // Auth check (Enterprise Isolation)
@@ -162,6 +174,12 @@ const server = serve({
       // Route handling
       if (req.method === "POST" && url.pathname === "/auth/login") {
         const response = await loginHandler(req);
+        logRequest(req, startTime, response.status);
+        return addCors(response);
+      }
+
+      if (req.method === "POST" && url.pathname === "/auth/register") {
+        const response = await registerHandler(req);
         logRequest(req, startTime, response.status);
         return addCors(response);
       }
@@ -231,6 +249,12 @@ const server = serve({
         return addCors(response);
       }
 
+      if (req.method === "POST" && url.pathname === "/cancel-batch") {
+        const response = await cancelBatchHandler(req, context);
+        logRequest(req, startTime, response.status);
+        return addCors(response);
+      }
+
       if (req.method === "GET" && url.pathname === "/job-status") {
         const response = await jobStatusHandler(req, context);
         logRequest(req, startTime, response.status);
@@ -239,6 +263,12 @@ const server = serve({
 
       if (req.method === "GET" && url.pathname === "/analytics") {
         const response = await analyticsHandler(req, context);
+        logRequest(req, startTime, response.status);
+        return addCors(response);
+      }
+
+      if (req.method === "GET" && url.pathname === "/analytics/roi") {
+        const response = await getRoiAnalyticsHandler(req, context);
         logRequest(req, startTime, response.status);
         return addCors(response);
       }
@@ -336,6 +366,45 @@ const server = serve({
         return addCors(response);
       }
 
+      // High-Volume Processing Queue
+      if (req.method === "POST" && url.pathname === "/batch/start") {
+        const response = await bulkProcessUploadHandler(req, context);
+        logRequest(req, startTime, response.status);
+        return addCors(response);
+      }
+      
+      if (req.method === "GET" && url.pathname.startsWith("/batch/status/")) {
+        const response = await getBatchStatusHandler(req, context);
+        logRequest(req, startTime, response.status);
+        return addCors(response);
+      }
+
+      // ATS Integration Routes
+      if (req.method === "POST" && url.pathname === "/ats/sync") {
+        const response = await atsSyncHandler(req, context);
+        logRequest(req, startTime, response.status);
+        return addCors(response);
+      }
+
+      // Recruiter State & History
+      if (req.method === "GET" && url.pathname === "/recruiter/active-state") {
+        const response = await getActiveStateHandler(req, context);
+        logRequest(req, startTime, response.status);
+        return addCors(response);
+      }
+
+      if (req.method === "POST" && url.pathname === "/recruiter/update-candidate") {
+        const response = await updateCandidateHandler(req, context);
+        logRequest(req, startTime, response.status);
+        return addCors(response);
+      }
+
+      if (req.method === "GET" && url.pathname === "/recruiter/history") {
+        const response = await getRecruiterHistoryHandler(req, context);
+        logRequest(req, startTime, response.status);
+        return addCors(response);
+      }
+
       // Scorecard Routes
       if (req.method === "POST" && url.pathname === "/scorecards") {
         const response = await submitScorecardHandler(req, context);
@@ -357,6 +426,36 @@ const server = serve({
 
       if (req.method === "GET" && url.pathname === "/scorecards/synthesis") {
         const response = await synthesizeScorecardsHandler(req, context);
+        logRequest(req, startTime, response.status);
+        return addCors(response);
+      }
+
+      // Privacy & GDPR Routes
+      if (req.method === "DELETE" && url.pathname.startsWith("/privacy/candidate/")) {
+        const response = await deleteCandidateGdprHandler(req, context);
+        logRequest(req, startTime, response.status);
+        return addCors(response);
+      }
+
+      if (req.method === "POST" && url.pathname === "/privacy/retention-cron") {
+        const response = await runRetentionPolicyHandler(req, context);
+        logRequest(req, startTime, response.status);
+        return addCors(response);
+      }
+
+      // India DPDP 2023 Compliance Routes
+      if (req.method === "GET" && url.pathname === "/dpdp/notice") {
+        const response = await getDpdpNoticeHandler(req);
+        logRequest(req, startTime, response.status);
+        return addCors(response);
+      }
+      if (req.method === "POST" && url.pathname === "/dpdp/grievance") {
+        const response = await fileGrievanceHandler(req);
+        logRequest(req, startTime, response.status);
+        return addCors(response);
+      }
+      if (req.method === "POST" && url.pathname === "/webhooks/dpdp/consent-manager") {
+        const response = await consentManagerWebhookHandler(req);
         logRequest(req, startTime, response.status);
         return addCors(response);
       }
@@ -428,3 +527,13 @@ setInterval(async () => {
     console.error('[BackgroundJob] Failed to process reminders:', error);
   }
 }, 60 * 1000); // 1 minute interval
+
+// Background Job: GDPR Data Retention Scrubber (Runs every 24 hours)
+setInterval(async () => {
+    try {
+      console.log('[BackgroundJob] Running GDPR Data Retention Protocol...');
+      await PrivacyService.enforceDataRetention(6); // Scrub profiles older than 6 months
+    } catch (error) {
+      console.error('[BackgroundJob] Failed to run retention policy:', error);
+    }
+}, 1000 * 60 * 60 * 24); // 24 hours

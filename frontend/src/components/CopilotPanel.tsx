@@ -304,7 +304,7 @@ export default function CopilotPanel() {
                                     </span>
                                 </div>
                                 <Card className="bg-muted/30">
-                                    <CardContent className="p-4 text-sm prose prose-sm max-w-none dark:prose-invert">
+                                    <CardContent className="p-4 text-sm prose prose-sm max-w-none">
                                         <div
                                             dangerouslySetInnerHTML={{
                                                 __html: item.response

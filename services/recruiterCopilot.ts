@@ -1,4 +1,4 @@
-import { groqChatCompletion } from "../utils/groqClient";
+import { autoRoutedChatCompletion } from "./llmRouter";
 import {
     RecruiterAssessmentInput,
     RecruiterAssessmentResult,
@@ -292,12 +292,15 @@ export async function generateRecruiterAssessment(
     try {
         const userPrompt = buildUserPrompt(input);
 
-        console.log("[RecruiterCopilot] Sending request to LLM");
-        const response = await groqChatCompletion(
+        console.log("[RecruiterCopilot] Sending request to LLM Router");
+        const response = await autoRoutedChatCompletion(
             RECRUITER_COPILOT_SYSTEM_PROMPT,
             userPrompt,
-            0.3, // Low temperature for consistent, factual output
-            2048 // Sufficient tokens for detailed assessment
+            {
+                temperature: 0.3,
+                max_tokens: 2048,
+                containsPII: true // Strong assumption of candidate data
+            }
         );
 
         console.log("[RecruiterCopilot] Received response, parsing...");
@@ -571,7 +574,11 @@ Query: "${query}"
 
 Respond with ONLY the category name.`;
 
-    const intent = await groqChatCompletion("You are a query classifier.", intentPrompt, 0, 100);
+    const intent = await autoRoutedChatCompletion(
+        "You are a query classifier.",
+        intentPrompt,
+        { temperature: 0, max_tokens: 100 }
+    );
     const category = intent.toUpperCase().trim();
 
     if (category.includes("ANALYTICS")) {
@@ -589,7 +596,11 @@ Data: ${JSON.stringify(result.results, null, 2)}
 Explanation: ${result.query.explanation}
 
 Provide a concise, professional answer. Use markdown tables if comparing multiple data points.`;
-            const answer = await groqChatCompletion("You are a helpful recruitment data analyst.", answerPrompt, 0.3, 1024);
+            const answer = await autoRoutedChatCompletion(
+                "You are a helpful recruitment data analyst.",
+                answerPrompt,
+                { temperature: 0.3, max_tokens: 1024 }
+            );
             return { response: answer, data: result.results };
         }
     }
@@ -608,7 +619,11 @@ User Question: "${query}"
 
 Provide a professional, evidence-based answer. If the information isn't in the context, say "I don't have enough information on that specific detail."`;
 
-        const answer = await groqChatCompletion(RECRUITER_COPILOT_SYSTEM_PROMPT, candidatePrompt, 0.5, 1024);
+        const answer = await autoRoutedChatCompletion(
+            RECRUITER_COPILOT_SYSTEM_PROMPT,
+            candidatePrompt,
+            { temperature: 0.5, max_tokens: 1024, containsPII: true }
+        );
         return { response: answer };
     }
 
@@ -617,6 +632,10 @@ Provide a professional, evidence-based answer. If the information isn't in the c
     
 Provide actionable, modern recruiting advice where applicable. Keep it concise.`;
 
-    const answer = await groqChatCompletion(RECRUITER_COPILOT_SYSTEM_PROMPT, generalPrompt, 0.7, 1024);
+    const answer = await autoRoutedChatCompletion(
+        RECRUITER_COPILOT_SYSTEM_PROMPT,
+        generalPrompt,
+        { temperature: 0.7, max_tokens: 1024 }
+    );
     return { response: answer };
 }

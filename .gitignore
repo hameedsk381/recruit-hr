@@ -9,3 +9,9 @@ dist/
 .vscode/
 out/
 coverage/
+*.pdf
+*.png
+*.docx
+NUL
+scratch/
+untracked_files.txt

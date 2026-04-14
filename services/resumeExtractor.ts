@@ -378,12 +378,66 @@ function calculateTotalExperience(experience: any[]): number {
     }
   }
 
-  // Cap at reasonable maximum
-  if (totalYears > 50) {
-    totalYears = 0; // Reset if unreasonably high
+  // Cap at reasonable maximum (40 years - no one has more)
+  if (totalYears > 40) {
+    totalYears = 40;
   }
 
   return Math.round(totalYears * 10) / 10; // Round to 1 decimal place
+}
+
+// Independent experience calculator - parses raw resume text to verify AI calculation
+function calculateIndependentExperience(rawText: string): number {
+  const text = rawText.toLowerCase();
+  let totalMonths = 0;
+
+  // Pattern: "Month Year - Month Year" or "Month Year to Month Year"
+  const monthYearPattern = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(20\d{2}|19\d{2})\s*(?:[-–]|to)\s*(?:(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(20\d{2}|19\d{2})|(present|current|n\.y\.|now))\b/gi;
+  let match;
+  while ((match = monthYearPattern.exec(text)) !== null) {
+    const startMonthIdx = getMonthIndex(match[1]);
+    const startYear = parseInt(match[2]);
+    let endMonthIdx: number, endYear: number;
+
+    if (match[4]) {
+      endMonthIdx = getMonthIndex(match[3]);
+      endYear = parseInt(match[4]);
+    } else {
+      endMonthIdx = new Date().getMonth();
+      endYear = new Date().getFullYear();
+    }
+
+    if (startMonthIdx >= 0 && endYear >= startYear) {
+      const months = (endYear - startYear) * 12 + (endMonthIdx - startMonthIdx);
+      if (months > 0 && months <= 480) totalMonths += months;
+    }
+  }
+
+  // Pattern: "Year - Year" (fallback when no month)
+  const yearRangePattern = /\b(20\d{2}|19\d{2})\s*[-–]\s*((20\d{2}|19\d{2})|(present|current))\b/gi;
+  while ((match = yearRangePattern.exec(text)) !== null) {
+    const startYear = parseInt(match[1]);
+    let endYear: number;
+
+    if (match[3]) {
+      endYear = parseInt(match[3]);
+    } else {
+      endYear = new Date().getFullYear();
+    }
+
+    if (endYear >= startYear) {
+      const years = endYear - startYear;
+      if (years > 0 && years <= 40) totalMonths += years * 12;
+    }
+  }
+
+  return Math.round((totalMonths / 12) * 10) / 10;
+}
+
+function getMonthIndex(monthStr: string): number {
+  const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  const idx = months.findIndex(m => monthStr.toLowerCase().startsWith(m));
+  return idx >= 0 ? idx : 0;
 }
 
 export async function extractResumeData(buffer: Buffer): Promise<ResumeData> {
@@ -491,18 +545,35 @@ export async function extractResumeData(buffer: Buffer): Promise<ResumeData> {
       console.log('[ResumeExtractor] Experience data:', JSON.stringify(resumeData.experience, null, 2));
       console.log('[ResumeExtractor] AI provided totalIndustrialExperienceYears:', resumeData.totalIndustrialExperienceYears);
 
+      // Independent calculation to verify AI output
+      const independentCalc = calculateIndependentExperience(text);
+      console.log('[ResumeExtractor] Independent calculation:', independentCalc, 'years');
+
       // Ensure we have a valid number for total industrial experience
+      let aiProvidedYears: number;
       if (resumeData.totalIndustrialExperienceYears === undefined ||
         resumeData.totalIndustrialExperienceYears === null ||
         isNaN(Number(resumeData.totalIndustrialExperienceYears))) {
         // Fallback: calculate from experience text if AI didn't provide it
         console.log('[ResumeExtractor] Using fallback calculation for total experience');
-        resumeData.totalIndustrialExperienceYears = calculateTotalExperience(resumeData.experience || []);
-        console.log('[ResumeExtractor] Fallback calculation result:', resumeData.totalIndustrialExperienceYears);
+        aiProvidedYears = calculateTotalExperience(resumeData.experience || []);
+        console.log('[ResumeExtractor] Fallback calculation result:', aiProvidedYears);
       } else {
-        resumeData.totalIndustrialExperienceYears = Number(resumeData.totalIndustrialExperienceYears) || 0;
-        console.log('[ResumeExtractor] Using AI provided total experience:', resumeData.totalIndustrialExperienceYears);
+        aiProvidedYears = Number(resumeData.totalIndustrialExperienceYears) || 0;
+        console.log('[ResumeExtractor] Using AI provided total experience:', aiProvidedYears);
       }
+
+      // Use AI value if reasonable, otherwise use independent calculation
+      if (aiProvidedYears > 0 && aiProvidedYears <= 40) {
+        resumeData.totalIndustrialExperienceYears = aiProvidedYears;
+      } else if (independentCalc > 0) {
+        console.log('[ResumeExtractor] AI value unreasonable, using independent calculation');
+        resumeData.totalIndustrialExperienceYears = independentCalc;
+      } else {
+        resumeData.totalIndustrialExperienceYears = aiProvidedYears;
+      }
+
+      console.log('[ResumeExtractor] Final verified experience:', resumeData.totalIndustrialExperienceYears, 'years');
 
       if (resumeData.totalDomainExperienceYears && typeof resumeData.totalDomainExperienceYears !== 'number') {
         resumeData.totalDomainExperienceYears = Number(resumeData.totalDomainExperienceYears) || 0;

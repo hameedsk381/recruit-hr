@@ -1,4 +1,5 @@
 import { useApp } from '../context/AppContext';
+import { Navigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import CopilotPanel from '../components/CopilotPanel';
 import JobSetup from '../pages/JobSetup';
@@ -9,80 +10,119 @@ import Interviews from '../pages/Interviews';
 import Pipeline from '../pages/Pipeline';
 import Settings from '../pages/Settings';
 import Profile from '../pages/Profile';
-import { Search, Bell, HelpCircle, LogOut } from 'lucide-react';
+import History from '../pages/History';
+import { Search, Bell, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function DashboardLayout() {
-    const { currentView, job, logout } = useApp();
+    const { currentView, setView, job, logout, user } = useApp();
+
+    if (!user) {
+        return <Navigate to="/login" replace />;
+    }
+
+    const renderView = () => {
+        switch (currentView) {
+            case 'dashboard': return <Dashboard />;
+            case 'setup': return <JobSetup />;
+            case 'shortlist': return <Shortlist />;
+            case 'detail': return <CandidateDetail />;
+            case 'interviews': return <Interviews />;
+            case 'pipeline': return <Pipeline />;
+            case 'settings': return <Settings />;
+            case 'profile': return <Profile />;
+            case 'history': return <History />;
+            default: return <Dashboard />;
+        }
+    };
 
     return (
-        <div className="flex h-screen w-full overflow-hidden bg-background text-foreground selection:bg-primary/20 selection:text-primary">
-            {/* Background Decorative Gradients */}
-            <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-                <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[120px]" />
-                <div className="absolute top-[20%] -right-[5%] w-[30%] h-[30%] bg-indigo-500/5 rounded-full blur-[100px]" />
-                <div className="absolute -bottom-[10%] left-[20%] w-[50%] h-[50%] bg-purple-500/5 rounded-full blur-[150px]" />
-            </div>
+        <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
+            {/* Skip to content — MUST per Agents.md */}
+            <a href="#dashboard-main" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 z-50 bg-black text-white px-4 py-2 rounded-md">Skip to content</a>
 
-            {/* Navigation Sidebar */}
+            {/* Background grid */}
+            <div className="fixed inset-0 z-0 subtle-grid opacity-[0.4] pointer-events-none" aria-hidden="true" />
+
             <Sidebar />
 
-            {/* Content Wrapper */}
             <div className="flex-1 flex flex-col min-w-0 relative z-10">
-                {/* Header */}
-                <header className="h-20 border-b bg-background/50 backdrop-blur-md px-8 flex items-center justify-between shrink-0">
+                <header className="h-16 border-b bg-background/80 backdrop-blur-xl px-8 flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-4 flex-1">
-                        <div className="relative max-w-md w-full hidden md:block">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                        <div className="relative max-w-sm w-full hidden md:block">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" aria-hidden="true" />
                             <input
-                                type="text"
-                                placeholder="Search candidates, jobs, or feedback..."
-                                className="w-full h-10 pl-10 pr-4 bg-muted/50 border-transparent rounded-xl text-sm focus:bg-background focus:border-primary/20 focus:ring-0 transition-all outline-hidden"
+                                id="global-search"
+                                type="search"
+                                placeholder="Search tasks, candidates…"
+                                className="w-full h-9 pl-9 pr-4 bg-muted/50 border-none rounded-md text-sm focus-visible:ring-2 focus-visible:ring-ring outline-none"
                             />
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        {job && (
-                            <div className="px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-[11px] font-bold text-primary uppercase mr-4">
-                                Active Job: {job.title}
-                            </div>
-                        )}
-                        <Button variant="ghost" size="icon" className="rounded-xl text-muted-foreground">
-                            <HelpCircle size={18} />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="rounded-xl text-muted-foreground relative">
-                            <Bell size={18} />
-                            <span className="absolute top-2 right-2 size-2 bg-destructive rounded-full border-2 border-background" />
-                        </Button>
-                        <div className="h-8 w-px bg-border mx-2" />
+                    <div className="flex items-center gap-2">
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                            onClick={logout}
+                            className="size-9 rounded-md text-muted-foreground hover:text-foreground"
+                            aria-label="Notifications"
                         >
-                            <LogOut size={18} />
+                            <Bell size={16} />
+                        </Button>
+                        <div className="h-4 w-px bg-border mx-1" aria-hidden="true" />
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-9 rounded-md text-muted-foreground hover:text-destructive"
+                            onClick={logout}
+                            aria-label="Sign out"
+                        >
+                            <LogOut size={16} />
                         </Button>
                     </div>
                 </header>
 
                 {/* Main Content Area */}
-                <main className="flex-1 overflow-y-auto p-8 scroll-smooth">
-                    <div className="max-w-[1600px] mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
-                        {currentView === 'dashboard' && <Dashboard />}
-                        {currentView === 'setup' && <JobSetup />}
-                        {currentView === 'shortlist' && <Shortlist />}
-                        {currentView === 'detail' && <CandidateDetail />}
-                        {currentView === 'interviews' && <Interviews />}
-                        {currentView === 'pipeline' && <Pipeline />}
-                        {currentView === 'settings' && <Settings />}
-                        {currentView === 'profile' && <Profile />}
+                <main id="dashboard-main" className="flex-1 overflow-y-auto">
+                    <div className="container mx-auto px-6 lg:px-12 py-8 max-w-7xl">
+                        {/* Breadcrumbs & Context */}
+                        <div className="flex items-center justify-between mb-8">
+                            <nav className="flex items-center gap-2 text-xs font-medium text-muted-foreground/60">
+                                <button onClick={() => setView('dashboard')} className="hover:text-foreground transition-colors uppercase tracking-widest">home</button>
+                                <span>/</span>
+                                <span className="text-foreground uppercase tracking-widest">{currentView === 'setup' ? 'campaign setup' : currentView}</span>
+                                {currentView === 'detail' && (
+                                    <>
+                                        <span>/</span>
+                                        <span className="text-foreground uppercase tracking-widest">profile</span>
+                                    </>
+                                )}
+                            </nav>
+
+                            {job && (
+                                <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full border bg-muted/30">
+                                    <div className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    <span className="text-[10px] font-bold uppercase tracking-widest">{job.title}</span>
+                                </div>
+                            )}
+                        </div>
+
+                        <AnimatePresence mode="wait">
+                            <motion.div
+                                key={currentView}
+                                initial={{ opacity: 0, y: 5 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -5 }}
+                                transition={{ duration: 0.2, ease: "easeInOut" }}
+                            >
+                                {renderView()}
+                            </motion.div>
+                        </AnimatePresence>
                     </div>
                 </main>
             </div>
 
-            {/* Copilot Panel (Right Sidebar) */}
             <CopilotPanel />
         </div>
     );

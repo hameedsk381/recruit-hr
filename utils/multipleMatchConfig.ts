@@ -45,7 +45,7 @@ export const DEFAULT_MULTIPLE_MATCH_CONFIG: MultipleMatchConfig = {
   limits: {
     maxJDFiles: parseInt(process.env.MAX_JD_FILES || '10'),
     maxResumeFiles: parseInt(process.env.MAX_RESUME_FILES || '10'),
-    maxCombinations: parseInt(process.env.MAX_COMBINATIONS || '50')
+    maxCombinations: parseInt(process.env.MAX_COMBINATIONS || '100')
   },
   
   files: {

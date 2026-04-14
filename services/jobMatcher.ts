@@ -190,7 +190,7 @@ Candidate Domain Experience Years: ${maskedResume.totalDomainExperienceYears || 
     const response = await groqChatCompletion(
       "You are an expert HR consultant specializing in job-resume matching analysis.",
       `${JOB_MATCHING_PROMPT}\n\nContext:\n${prompt}`,
-      0.5,
+      0.3,
       1536
     );
 
@@ -199,13 +199,18 @@ Candidate Domain Experience Years: ${maskedResume.totalDomainExperienceYears || 
 
     let matchResult: any = extractJsonFromResponse(response);
 
+    // Provide safe defaults if the LLM hallucinated keys
+    if (!matchResult) matchResult = {};
+    if (!matchResult["Resume Data"]) matchResult["Resume Data"] = {};
+    if (!matchResult.Analysis) matchResult.Analysis = {};
+
     // UNMASK if necessary (Restore name/email from original resume)
     matchResult["Resume Data"].name = resume.name;
     matchResult["Resume Data"].email = resume.email;
     matchResult["Resume Data"].mobile_number = resume.phone;
 
     // Mapping additional properties for backend compatibility
-    matchResult.matchScore = matchResult.Analysis["Matching Score"];
+    matchResult.matchScore = matchResult.Analysis["Matching Score"] || 0;
     matchResult.summary = `Evaluated candidate background against ${jobDescription.title}.`;
 
     // Cache the result

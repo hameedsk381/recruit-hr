@@ -3,11 +3,12 @@ import { AppProvider } from './context/AppContext';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import CandidatePortal from './pages/CandidatePortal';
 import DashboardLayout from './layouts/DashboardLayout';
 
 
 /**
- * talentacquisition.ai - Recruiter Decision Interface
+ * reckuit.ai - Recruiter Decision Interface
  * 
  * CORE SCREENS:
  * 1. Landing - Public marketing page
@@ -24,6 +25,7 @@ function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/portal/:id" element={<CandidatePortal />} />
 
           {/* Protected App Routes */}
           <Route path="/app/*" element={<DashboardLayout />} />
