@@ -11,6 +11,7 @@ import Pipeline from '../pages/Pipeline';
 import Settings from '../pages/Settings';
 import Profile from '../pages/Profile';
 import History from '../pages/History';
+import HMDashboard from '../pages/HMDashboard';
 import { Search, Bell, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -22,7 +23,19 @@ export default function DashboardLayout() {
         return <Navigate to="/login" replace />;
     }
 
+    const isHM = user.role === 'hiring_manager';
+
     const renderView = () => {
+        // Force HM to their specific dashboard if they are not in valid sub-views
+        if (isHM) {
+            switch (currentView) {
+                case 'history': return <History />;
+                case 'profile': return <Profile />;
+                case 'settings': return <Settings />;
+                default: return <HMDashboard />;
+            }
+        }
+
         switch (currentView) {
             case 'dashboard': return <Dashboard />;
             case 'setup': return <JobSetup />;

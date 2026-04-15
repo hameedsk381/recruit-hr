@@ -243,6 +243,33 @@ export default function CandidateDetail() {
                             </div>
                         </section>
 
+                        {(candidate as any).screeningSummary && (
+                            <section className="space-y-4 animate-in slide-in-from-bottom-2 duration-700">
+                                <h3 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2 text-indigo-600">
+                                    <Mic size={16} /> AI Technical Evaluator Insights
+                                </h3>
+                                <div className="vercel-card bg-indigo-500/5 border-indigo-500/10 shadow-lg shadow-indigo-500/10 p-8 space-y-4">
+                                    <div className="flex items-start gap-4">
+                                        <div className="size-12 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
+                                            <Sparkles size={20} className="text-indigo-600" />
+                                        </div>
+                                        <div className="space-y-4">
+                                            <p className="text-sm text-indigo-900/80 font-medium leading-relaxed">
+                                                The candidate completed a technical evaluator interview. Key highlights from the transcript:
+                                            </p>
+                                            <div className="prose prose-sm prose-indigo max-w-none text-indigo-950 font-serif text-lg leading-relaxed">
+                                                {(candidate as any).screeningSummary}
+                                            </div>
+                                            <div className="flex items-center gap-2 pt-4 border-t border-indigo-200">
+                                                <Badge className="bg-indigo-600 text-white border-transparent">Verified Transcript</Badge>
+                                                <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Sovereign Identity Protection Active</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+                        )}
+
                         <div className="grid md:grid-cols-2 gap-8">
                             <div className="space-y-4">
                                 <h4 className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 text-emerald-600">

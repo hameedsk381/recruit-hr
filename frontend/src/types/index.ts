@@ -117,7 +117,7 @@ export interface CandidateAssessment {
 
 // ==================== Shortlist Types ====================
 
-export type PipelineStage = 'applied' | 'shortlisted' | 'technical' | 'culture' | 'pending' | 'offer';
+export type PipelineStage = 'applied' | 'shortlisted' | 'technical' | 'culture' | 'pending' | 'offer' | 'hm_approved' | 'hm_rejected';
 
 export interface ShortlistCandidate {
     id: string;
@@ -128,6 +128,8 @@ export interface ShortlistCandidate {
     removed: boolean;
     removal_reason?: string;
     stage?: PipelineStage;
+    hmDecision?: 'approved' | 'rejected';
+    hmNotes?: string;
 }
 
 // ==================== Copilot Types ====================

@@ -64,6 +64,7 @@ export default function Shortlist() {
     const [removeReason, setRemoveReason] = useState('');
     const [filters, setFilters] = useState({
         fitLevel: [] as string[],
+        stages: [] as string[],
         showRemoved: false,
     });
     const [sortBy, setSortBy] = useState<'rank' | 'name' | 'fit'>('rank');
@@ -86,7 +87,7 @@ export default function Shortlist() {
                                 id: item.matchResult?.Id || item.resumeName,
                                 name: item.matchResult?.['Resume Data']?.name || item.resumeName,
                                 email: item.matchResult?.['Resume Data']?.email || 'N/A',
-                                extracted_skills: item.matchResult?.['Resume Data']?.skills || [],
+                                extracted_skills: Array.isArray(item.matchResult?.['Resume Data']?.skills) ? item.matchResult['Resume Data'].skills : [],
                                 experience_estimate: { total_years: item.matchResult?.['Resume Data']?.experience || 0 },
                             },
                             assessment: {
@@ -95,10 +96,14 @@ export default function Shortlist() {
                                     overall_fit: (item.matchResult?.matchScore || 0) >= 80 ? 'high' : (item.matchResult?.matchScore || 0) >= 60 ? 'medium' : 'low',
                                     reasoning: `Match score: ${item.matchResult?.matchScore}%`,
                                 },
-                                strengths: (item.matchResult?.Analysis?.['Matched Skills'] || []).slice(0, 3).map((skill: string) => ({ skill, evidence_level: 'claimed' as const, evidence: 'Interpreted from resume' })),
-                                gaps_and_risks: (item.matchResult?.Analysis?.['Unmatched Skills'] || []).slice(0, 2).map((area: string) => ({ area, risk_level: 'medium' as const, explanation: 'Not mentioned' })),
+                                strengths: (Array.isArray(item.matchResult?.Analysis?.['Matched Skills']) ? item.matchResult.Analysis['Matched Skills'] : [])
+                                    .slice(0, 3)
+                                    .map((skill: string) => ({ skill: typeof skill === 'string' ? skill : 'Unknown', evidence_level: 'claimed' as const, evidence: 'Interpreted from resume' })),
+                                gaps_and_risks: (Array.isArray(item.matchResult?.Analysis?.['Unmatched Skills']) ? item.matchResult.Analysis['Unmatched Skills'] : [])
+                                    .slice(0, 2)
+                                    .map((area: string) => ({ area: typeof area === 'string' ? area : 'Unknown', risk_level: 'medium' as const, explanation: 'Not mentioned' })),
                                 skill_match_breakdown: [],
-                                interview_focus_areas: [],
+                                interview_focus_areas: Array.isArray(item.matchResult?.Analysis?.Recommendations) ? item.matchResult.Analysis.Recommendations : [],
                                 recruiter_notes: { override_suggestions: '', confidence_level: 'medium' as const },
                             },
                             rank: index + 1,
@@ -177,6 +182,7 @@ export default function Shortlist() {
     let visibleCandidates = candidates.filter(c => {
         if (!filters.showRemoved && c.removed) return false;
         if (filters.fitLevel.length > 0 && !filters.fitLevel.includes(c.assessment.fit_assessment.overall_fit)) return false;
+        if (filters.stages.length > 0 && !filters.stages.includes(c.stage || 'applied')) return false;
         return true;
     });
 
@@ -314,6 +320,25 @@ export default function Shortlist() {
                                 </div>
                             ))}
                         </div>
+                        <div className="space-y-6 pt-6 border-t">
+                            <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                                <Activity size={14} /> Pipeline Stage
+                            </h4>
+                            <div className="space-y-3">
+                                {['applied', 'shortlisted', 'technical', 'culture', 'offer'].map(stage => (
+                                    <div key={stage} className="flex items-center justify-between group cursor-pointer" onClick={() => {
+                                        if (filters.stages.includes(stage)) {
+                                            setFilters(f => ({ ...f, stages: f.stages.filter(s => s !== stage) }));
+                                        } else {
+                                            setFilters(f => ({ ...f, stages: [...f.stages, stage] }));
+                                        }
+                                    }}>
+                                        <span className="text-xs font-medium capitalize">{stage}</span>
+                                        <Checkbox checked={filters.stages.includes(stage)} className="rounded" />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     </div>
 
                     <div className="pt-8 border-t space-y-6">
@@ -360,6 +385,9 @@ export default function Shortlist() {
                                                 <div className="flex items-center gap-3">
                                                     <h3 className="text-lg font-bold truncate">{candidate.profile.name}</h3>
                                                     {candidate.pinned && <Badge variant="secondary" className="px-1.5 py-0 rounded font-bold text-[9px] uppercase tracking-tighter">Pinned</Badge>}
+                                                    <Badge variant="outline" className="px-1.5 py-0 rounded font-bold text-[9px] uppercase tracking-widest bg-blue-50 text-blue-600 border-blue-100">
+                                                        {candidate.stage || 'applied'}
+                                                    </Badge>
                                                 </div>
                                                 <p className="text-sm text-muted-foreground line-clamp-1">{candidate.assessment.one_line_summary}</p>
                                                 <div className="flex items-center gap-4 pt-2">

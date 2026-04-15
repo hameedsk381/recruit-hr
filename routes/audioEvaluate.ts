@@ -1,6 +1,7 @@
 import { evaluateAudioFiles } from '../services/audioEvaluator';
+import { AuthContext } from '../middleware/authMiddleware';
 
-export async function audioEvaluateHandler(req: Request): Promise<Response> {
+export async function audioEvaluateHandler(req: Request, context: AuthContext): Promise<Response> {
   try {
     // Check if the content type is multipart/form-data
     const contentType = req.headers.get('content-type');

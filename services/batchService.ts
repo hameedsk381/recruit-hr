@@ -1,5 +1,5 @@
 import { getMongoDb } from '../utils/mongoClient';
-import { logger } from '../utils/logger';
+import { logger, createLogger } from '../utils/logger';
 
 export interface BatchJob {
     batchId: string;
@@ -34,27 +34,25 @@ export class BatchService {
             updatedAt: new Date()
         };
 
+        const batchLogger = createLogger(undefined, 'BatchService', data.tenantId, data.userId);
         await db.collection(BATCH_COLLECTION).insertOne(batch);
-        logger.info('Created assessment batch in DB', { batchId: data.batchId });
+        batchLogger.info('Created assessment batch in DB', { batchId: data.batchId });
     }
 
-    static async updateJobProgress(batchId: string, result: any, isSuccess: boolean): Promise<void> {
+    static async updateJobProgress(batchId: string, tenantId: string, result: any, isSuccess: boolean): Promise<void> {
         const db = getMongoDb();
         if (!db) return;
-
-        const tenantBatch = await db.collection<BatchJob>(BATCH_COLLECTION).findOne({ batchId });
-        if (!tenantBatch) return;
 
         if (isSuccess && result) {
             // Enterprise Scaling: Save result to separate collection to avoid 16MB limit
             await db.collection('assessment_results').insertOne({
                 batchId,
-                tenantId: tenantBatch.tenantId,
+                tenantId,
                 ...result,
                 createdAt: new Date()
             });
             await db.collection(BATCH_COLLECTION).updateOne(
-                { batchId },
+                { batchId, tenantId },
                 { 
                     $inc: { completedJobs: 1 },
                     $set: { updatedAt: new Date() }
@@ -62,7 +60,7 @@ export class BatchService {
             );
         } else {
             await db.collection(BATCH_COLLECTION).updateOne(
-                { batchId },
+                { batchId, tenantId },
                 { 
                     $inc: { failedJobs: 1 },
                     $set: { updatedAt: new Date() }
@@ -71,13 +69,13 @@ export class BatchService {
         }
 
         // Check if finished
-        const batch = await db.collection<BatchJob>(BATCH_COLLECTION).findOne({ batchId });
+        const batch = await db.collection<BatchJob>(BATCH_COLLECTION).findOne({ batchId, tenantId });
         if (batch && (batch.completedJobs + batch.failedJobs >= batch.totalJobs)) {
             await db.collection(BATCH_COLLECTION).updateOne(
-                { batchId },
+                { batchId, tenantId },
                 { $set: { status: 'COMPLETED', updatedAt: new Date() } }
             );
-            logger.info('Batch process marked as COMPLETED', { batchId });
+            logger.info('Batch process marked as COMPLETED', { batchId, tenantId });
         }
     }
 
@@ -108,11 +106,11 @@ export class BatchService {
         return result.modifiedCount > 0;
     }
 
-    static async isBatchCancelled(batchId: string): Promise<boolean> {
+    static async isBatchCancelled(batchId: string, tenantId: string): Promise<boolean> {
         const db = getMongoDb();
         if (!db) return false;
 
-        const batch = await db.collection<BatchJob>(BATCH_COLLECTION).findOne({ batchId }, { projection: { status: 1 } });
+        const batch = await db.collection<BatchJob>(BATCH_COLLECTION).findOne({ batchId, tenantId }, { projection: { status: 1 } });
         return batch?.status === 'CANCELLED';
     }
 }

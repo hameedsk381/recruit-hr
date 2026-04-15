@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../api/client';
+import { useApp } from '../context/AppContext';
 import { Cpu, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +9,7 @@ import { Label } from "@/components/ui/label";
 
 export default function Login() {
     const navigate = useNavigate();
+    const { login } = useApp();
     const [loading, setLoading] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -26,17 +28,18 @@ export default function Login() {
         try {
             const res = await api.login(email.trim(), password, 'tenant-default-001');
             if (res.success && res.token) {
-                localStorage.setItem('user', JSON.stringify({
+                login({
                     email: res.user.email,
                     name: res.user.email.split('@')[0],
-                    role: 'recruiter'
-                }));
+                    role: 'recruiter',
+                    plan: 'enterprise'
+                });
                 navigate('/app');
             } else {
                 setError(res.error || 'Invalid credentials. Please try again.');
             }
-        } catch {
-            setError('Connection failed. Please check your network.');
+        } catch (err: any) {
+            setError(err.message || 'Connection failed. Please check your network.');
         } finally {
             setLoading(false);
         }

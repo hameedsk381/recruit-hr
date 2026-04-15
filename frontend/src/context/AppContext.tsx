@@ -80,6 +80,8 @@ interface AppActions {
     // UI
     setView: (view: AppState['currentView']) => void;
     toggleSidebar: () => void;
+    submitHMDecision: (candidateId: string, decision: 'approved' | 'rejected', notes: string) => Promise<void>;
+    login: (user: any) => void;
     logout: () => void;
 }
 
@@ -109,7 +111,7 @@ const mapBatchToState = (batch: any) => ({
             name: c.matchResult?.['Resume Data']?.name || c.resumeName,
             email: c.matchResult?.['Resume Data']?.email || 'N/A',
             phone: c.matchResult?.['Resume Data']?.mobile_number || 'N/A',
-            extracted_skills: c.matchResult?.['Resume Data']?.skills || [],
+            extracted_skills: Array.isArray(c.matchResult?.['Resume Data']?.skills) ? c.matchResult['Resume Data'].skills : [],
             experience_estimate: { total_years: c.matchResult?.['Resume Data']?.experience || 0 },
             recent_role: { title: c.matchResult?.['Resume Data']?.designation || 'Professional' }
         },
@@ -119,14 +121,16 @@ const mapBatchToState = (batch: any) => ({
                 overall_fit: (c.matchResult?.matchScore || 0) >= 80 ? 'high' : (c.matchResult?.matchScore || 0) >= 60 ? 'medium' : 'low',
                 scorecard: []
             },
-            strengths: (c.matchResult?.Analysis?.['Matched Skills'] || []).map((s: string) => ({ skill: s, evidence_level: 'claimed', evidence: 'From resume' })),
-            weaknesses: (c.matchResult?.Analysis?.['Unmatched Skills'] || []).map((s: string) => ({ area: s, risk_level: 'medium', explanation: 'Missing' })),
-            interview_focus_areas: c.matchResult?.Analysis?.Recommendations || []
+            strengths: (Array.isArray(c.matchResult?.Analysis?.['Matched Skills']) ? c.matchResult.Analysis['Matched Skills'] : []).map((s: string) => ({ skill: typeof s === 'string' ? s : 'Unknown', evidence_level: 'claimed', evidence: 'From resume' })),
+            weaknesses: (Array.isArray(c.matchResult?.Analysis?.['Unmatched Skills']) ? c.matchResult.Analysis['Unmatched Skills'] : []).map((s: string) => ({ area: typeof s === 'string' ? s : 'Unknown', risk_level: 'medium', explanation: 'Missing' })),
+            interview_focus_areas: Array.isArray(c.matchResult?.Analysis?.Recommendations) ? c.matchResult.Analysis.Recommendations : []
         },
         rank: index + 1,
         pinned: false,
         removed: c.removed || false,
-        stage: c.stage || 'applied'
+        stage: c.stage || 'applied',
+        hmDecision: c.hmDecision,
+        hmNotes: c.hmNotes
     }))
 });
 
@@ -322,6 +326,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
         });
     }, []);
 
+    const submitHMDecision = useCallback(async (candidateId: string, decision: 'approved' | 'rejected', notes: string) => {
+        const stage = decision === 'approved' ? 'hm_approved' : 'hm_rejected';
+        setState(prev => {
+            if (prev.batchId) {
+                api.updateCandidate(prev.batchId!, candidateId, { 
+                    hmDecision: decision, 
+                    hmNotes: notes,
+                    stage
+                 });
+            }
+            return {
+                ...prev,
+                candidates: prev.candidates.map(c =>
+                    c.id === candidateId ? { 
+                        ...c, 
+                        hmDecision: decision, 
+                        hmNotes: notes,
+                        stage
+                    } : c
+                ),
+            };
+        });
+    }, []);
+
     const toggleCopilot = useCallback(() => {
         setState(prev => ({
             ...prev,
@@ -387,10 +415,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setState(prev => ({ ...prev, sidebarOpen: !prev.sidebarOpen }));
     }, []);
 
+    const login = useCallback((user: any) => {
+        localStorage.setItem('user', JSON.stringify(user));
+        setState(prev => ({ ...prev, user }));
+    }, []);
+
     const logout = useCallback(() => {
         localStorage.removeItem('user');
         localStorage.removeItem('auth_token');
         sessionStorage.removeItem('frontend_ui_state');
+        setState(prev => ({ ...prev, user: null }));
         window.location.href = '/login';
     }, []);
 
@@ -418,7 +452,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         addInterview,
         setError,
         setView,
+        submitHMDecision,
         toggleSidebar,
+        login,
         logout,
     };
 

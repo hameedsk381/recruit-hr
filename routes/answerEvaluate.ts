@@ -1,6 +1,7 @@
 import { evaluateAnswer, type EvaluationInput, type EvaluationScores } from '../services/answerEvaluator';
+import { AuthContext } from '../middleware/authMiddleware';
 
-export async function answerEvaluateHandler(req: Request): Promise<Response> {
+export async function answerEvaluateHandler(req: Request, context: AuthContext): Promise<Response> {
   try {
     // Check if the content type is JSON
     const contentType = req.headers.get('content-type');

@@ -7,14 +7,18 @@ import { motion } from 'framer-motion';
 export default function Sidebar() {
     const { currentView, sidebarOpen, setView, job, user, logout } = useApp();
 
+    const isHM = user?.role === 'hiring_manager';
+
     const menuItems = [
-        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, category: 'Main' },
+        { id: 'dashboard', label: isHM ? 'My Candidates' : 'Dashboard', icon: LayoutDashboard, category: 'Main' },
         { id: 'history', label: 'Search History', icon: Clock, category: 'Main' },
-        { id: 'setup', label: 'Job Setup', icon: ClipboardList, category: 'Pipeline', check: !!job },
-        { id: 'shortlist', label: 'Shortlist', icon: Users, category: 'Pipeline', disabled: !job },
-        { id: 'pipeline', label: 'Kanban Board', icon: Columns, category: 'Pipeline', disabled: !job },
-        { id: 'interviews', label: 'Interviews', icon: Calendar, category: 'Pipeline', disabled: !job },
+        { id: 'setup', label: 'Job Setup', icon: ClipboardList, category: 'Pipeline', check: !!job, hidden: isHM },
+        { id: 'shortlist', label: 'Shortlist', icon: Users, category: 'Pipeline', disabled: !job, hidden: isHM },
+        { id: 'pipeline', label: 'Kanban Board', icon: Columns, category: 'Pipeline', disabled: !job, hidden: isHM },
+        { id: 'interviews', label: 'Interviews', icon: Calendar, category: 'Pipeline', disabled: !job, hidden: isHM },
     ];
+
+    const visibleCategories = isHM ? ['Main'] : ['Main', 'Pipeline'];
 
     return (
         <aside className={cn(
@@ -34,13 +38,13 @@ export default function Sidebar() {
 
                 {/* Navigation */}
                 <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-6">
-                    {['Main', 'Pipeline'].map((category) => (
+                    {visibleCategories.map((category) => (
                         <div key={category} className="space-y-1">
                             <h3 className="px-3 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">
                                 {category}
                             </h3>
                             <div className="space-y-1">
-                                {menuItems.filter(item => item.category === category).map((item) => {
+                                {menuItems.filter(item => item.category === category && !item.hidden).map((item) => {
                                     const isActive = currentView === item.id || (item.id === 'shortlist' && currentView === 'detail');
                                     const Icon = item.icon;
 
