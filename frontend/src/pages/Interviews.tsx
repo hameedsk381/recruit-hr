@@ -27,9 +27,12 @@ import {
     CheckCircle2,
     ClipboardList,
     Mail,
-    CalendarCheck
+    CalendarCheck,
+    ChevronRight,
+    Users
 } from 'lucide-react';
 import ScorecardDialog from '../components/ScorecardDialog';
+import { cn } from "@/lib/utils";
 
 export default function Interviews() {
     const {
@@ -152,49 +155,53 @@ export default function Interviews() {
     if (interviewsLoading) {
         return (
             <div className="p-8 flex items-center justify-center h-[calc(100vh-100px)]">
-                <div className="animate-pulse size-8 bg-primary rounded-full" />
+                <RotateCcw className="size-6 animate-spin text-muted-foreground" />
             </div>
         );
     }
 
     return (
-        <div className="container mx-auto px-4 py-8 space-y-8 animate-in fade-in duration-500">
-            <div className="flex justify-between items-start">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Interview Schedule</h1>
-                    <p className="text-muted-foreground mt-1">Manage and automate your technical evaluations.</p>
+        <div className="container mx-auto max-w-6xl px-4 py-8 space-y-8 animate-in fade-in duration-500">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+                <div className="space-y-1">
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+                        <CalendarDays className="size-6" />
+                        Interviews
+                    </h1>
+                    <p className="text-sm text-muted-foreground">Manage and automate your technical evaluations.</p>
                 </div>
                 <div className="flex items-center gap-3">
                     {calendarStatus?.connected ? (
-                        <div className="flex items-center gap-2 bg-green-50 text-green-700 px-4 py-2 rounded-full border border-green-100 text-sm font-medium animate-in slide-in-from-right">
-                            <CalendarCheck className="size-4" />
-                            <span>{calendarStatus.email} synced</span>
-                            <div className="size-2 bg-green-500 rounded-full animate-pulse" />
+                        <div className="flex items-center gap-2 bg-emerald-500/10 text-emerald-700 px-3 py-1.5 rounded-md border border-emerald-500/20 text-xs font-semibold">
+                            <CalendarCheck className="size-3.5" />
+                            <span>{calendarStatus.email}</span>
+                            <div className="size-1.5 bg-emerald-500 rounded-full animate-pulse ml-1" />
                         </div>
                     ) : (
                         <Button
                             variant="outline"
-                            className="gap-2 border-primary/20 hover:bg-primary/5 text-primary"
+                            size="sm"
+                            className="gap-2 text-foreground"
                             onClick={handleConnectCalendar}
                             disabled={isConnecting}
                         >
                             {isConnecting ? (
-                                <RotateCcw className="size-4 animate-spin" />
+                                <RotateCcw className="size-3.5 animate-spin" />
                             ) : (
-                                <CalendarDays className="size-4" />
+                                <CalendarDays className="size-3.5 text-muted-foreground" />
                             )}
-                            Connect Google Calendar
+                            Sync Calendar
                         </Button>
                     )}
-                    <Button className="gap-2" onClick={() => setView('shortlist')}>
-                        <Plus className="size-4" />
-                        Schedule from Shortlist
+                    <Button size="sm" className="gap-2" onClick={() => setView('shortlist')}>
+                        <Plus className="size-3.5" />
+                        Schedule
                     </Button>
                 </div>
             </div>
 
             {/* Status Filter Tabs */}
-            <div className="flex gap-2 border-b pb-4">
+            <div className="flex gap-2 border-b border-border/50 pb-px">
                 {(['all', 'scheduled', 'completed', 'cancelled'] as const).map(status => {
                     const count = status === 'all'
                         ? interviews.length
@@ -204,16 +211,16 @@ export default function Interviews() {
                             key={status}
                             onClick={() => setStatusFilter(status)}
                             className={cn(
-                                "px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2",
+                                "px-4 py-2.5 text-sm font-medium transition-colors flex items-center gap-2 border-b-2",
                                 statusFilter === status
-                                    ? "bg-primary text-primary-foreground"
-                                    : "bg-muted hover:bg-muted/80 text-muted-foreground"
+                                    ? "border-foreground text-foreground"
+                                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
                             )}
                         >
-                            {status.charAt(0).toUpperCase() + status.slice(1)}
+                            <span className="capitalize">{status}</span>
                             <span className={cn(
-                                "text-xs px-1.5 py-0.5 rounded-full",
-                                statusFilter === status ? "bg-primary-foreground/20" : "bg-background"
+                                "text-xs px-1.5 py-0.5 rounded-full inline-flex items-center justify-center font-semibold",
+                                statusFilter === status ? "bg-foreground text-background" : "bg-muted text-muted-foreground"
                             )}>
                                 {count}
                             </span>
@@ -223,135 +230,144 @@ export default function Interviews() {
             </div>
 
             {filteredInterviews.length === 0 ? (
-                <Card className="border-2 border-dashed flex flex-col items-center justify-center p-12 text-center space-y-4">
-                    <div className="p-4 bg-muted rounded-full">
-                        <CalendarDays className="size-10 text-muted-foreground" />
+                <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 rounded-xl border border-dashed border-border/60 bg-muted/20">
+                    <div className="p-4 bg-muted/50 rounded-full">
+                        <CalendarDays className="size-10 text-muted-foreground/60" />
                     </div>
                     <div className="max-w-xs">
-                        <h3 className="text-lg font-semibold">
+                        <h3 className="text-sm font-semibold text-foreground">
                             {statusFilter === 'all' ? 'No interviews scheduled' : `No ${statusFilter} interviews`}
                         </h3>
-                        <p className="text-sm text-muted-foreground mt-1">
+                        <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
                             {statusFilter === 'all'
-                                ? 'Go to your shortlist and select "Schedule Interview" for any candidate to get started.'
+                                ? 'Go to your shortlist and select "Schedule" for any candidate to get started.'
                                 : `There are no interviews with status "${statusFilter}" at this time.`
                             }
                         </p>
                     </div>
                     {statusFilter === 'all' && (
-                        <Button variant="outline" onClick={() => setView('shortlist')}>View Shortlist</Button>
+                        <Button variant="outline" size="sm" onClick={() => setView('shortlist')} className="mt-2">
+                            View Pipeline
+                        </Button>
                     )}
-                </Card>
+                </div>
             ) : (
                 <div className="grid grid-cols-1 gap-4">
                     {filteredInterviews.map((interview) => (
-                        <Card key={interview.id} className="hover:shadow-md transition-shadow group">
-                            <CardContent className="p-6 flex flex-col md:flex-row items-start md:items-center gap-6">
-                                <div className="flex-1 space-y-1">
-                                    <div className="flex items-center gap-3">
-                                        <h3 className="text-lg font-bold">{interview.candidateName}</h3>
-                                        <Badge variant={interview.status === 'scheduled' ? 'default' : 'secondary'}>
-                                            {interview.status.charAt(0).toUpperCase() + interview.status.slice(1)}
+                        <div key={interview.id} className="vercel-card !p-0 overflow-hidden hover:border-foreground/20 group bg-card transition-all">
+                            <div className="p-5 flex flex-col md:flex-row items-start md:items-center gap-6">
+                                <div className="flex-1 space-y-3 min-w-0">
+                                    <div className="flex items-center gap-3 flex-wrap">
+                                        <h3 className="text-base font-semibold text-foreground truncate">{interview.candidateName}</h3>
+                                        <Badge variant={interview.status === 'scheduled' ? 'default' : interview.status === 'completed' ? 'secondary' : 'outline'} className="capitalize h-5 px-2 text-[10px] font-semibold tracking-wide">
+                                            {interview.status}
                                         </Badge>
-                                        <Badge variant="outline" className="capitalize">{interview.type}</Badge>
+                                        <Badge variant="outline" className="capitalize h-5 px-2 text-[10px] font-semibold tracking-wide border-dashed">
+                                            {interview.type}
+                                        </Badge>
                                     </div>
-                                    <p className="text-sm text-muted-foreground font-medium">
+                                    <p className="text-sm text-muted-foreground font-medium flex items-center gap-2">
+                                        <Users className="size-3.5" />
                                         {interview.jobTitle}
                                     </p>
-                                    <div className="flex flex-wrap gap-4 mt-4 text-sm">
-                                        <div className="flex items-center gap-1.5 text-muted-foreground">
-                                            <Calendar className="size-4" />
+                                    <div className="flex flex-wrap gap-x-5 gap-y-2 mt-4 text-xs">
+                                        <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
+                                            <Calendar className="size-3.5" />
                                             {new Date(interview.startTime).toLocaleDateString(undefined, {
                                                 weekday: 'short',
                                                 month: 'short',
                                                 day: 'numeric'
                                             })}
                                         </div>
-                                        <div className="flex items-center gap-1.5 text-muted-foreground">
-                                            <Clock className="size-4" />
+                                        <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
+                                            <Clock className="size-3.5" />
                                             {new Date(interview.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </div>
-                                        <div className="flex items-center gap-1.5 text-blue-600 font-medium">
-                                            <Video className="size-4" />
-                                            <a href={interview.meetingLink} target="_blank" rel="noreferrer" className="hover:underline flex items-center gap-1">
-                                                Join Meeting <ExternalLink className="size-3" />
-                                            </a>
-                                        </div>
+                                        {interview.status !== 'cancelled' && (
+                                            <div className="flex items-center gap-1.5 text-blue-600 font-semibold hover:text-blue-700 transition-colors">
+                                                <Video className="size-3.5" />
+                                                <a href={interview.meetingLink} target="_blank" rel="noreferrer" className="flex items-center gap-1 hover:underline underline-offset-2">
+                                                    Join Meeting <ExternalLink className="size-3" />
+                                                </a>
+                                            </div>
+                                        )}
                                         {/* Sync Status Indicators */}
                                         {interview.status === 'scheduled' && (
                                             <>
-                                                {interview.calendarLink && (
-                                                    <div className="flex items-center gap-1 text-green-600 text-xs">
+                                                {interview.calendarLink ? (
+                                                    <div className="flex items-center gap-1.5 text-emerald-600 font-medium">
                                                         <CalendarCheck className="size-3.5" />
-                                                        <a href={interview.calendarLink} target="_blank" rel="noreferrer" className="hover:underline">Open in Calendar</a>
+                                                        <a href={interview.calendarLink} target="_blank" rel="noreferrer" className="hover:underline underline-offset-2">Open Calendar Event</a>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-1.5 text-emerald-600 font-medium">
+                                                        <CalendarCheck className="size-3.5" />
+                                                        <span>Synced</span>
                                                     </div>
                                                 )}
-                                                {!interview.calendarLink && (
-                                                    <div className="flex items-center gap-1 text-green-600 text-xs">
-                                                        <CalendarCheck className="size-3.5" />
-                                                        <span>Calendar Synced</span>
-                                                    </div>
-                                                )}
-                                                <div className="flex items-center gap-1 text-green-600 text-xs">
-                                                    <Mail className="size-3.5" />
-                                                    <span>Invite Sent</span>
-                                                </div>
                                             </>
                                         )}
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-wrap items-center gap-2 shrink-0">
                                     {interview.status === 'scheduled' && (
                                         <>
                                             <Button
                                                 variant="outline"
                                                 size="sm"
+                                                className="h-8 text-xs font-semibold"
                                                 onClick={() => handleReschedule(interview.id, interview.candidateId)}
                                             >
                                                 Reschedule
                                             </Button>
                                             <Button
+                                                variant="secondary"
+                                                size="sm"
+                                                className="h-8 text-xs font-semibold gap-1.5"
+                                                onClick={() => setScorecardInterview(interview)}
+                                            >
+                                                <ClipboardList className="size-3.5" />
+                                                Scorecard
+                                            </Button>
+                                            <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                className="text-muted-foreground hover:text-destructive"
+                                                className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                                                 onClick={() => setCancelId(interview.id)}
+                                                title="Cancel Interview"
                                             >
                                                 <XCircle className="size-4" />
                                             </Button>
-                                            <Button
-                                                variant="secondary"
-                                                size="sm"
-                                                className="gap-1"
-                                                onClick={() => setScorecardInterview(interview)}
-                                            >
-                                                <ClipboardList className="size-4" />
-                                                Scorecard
-                                            </Button>
                                         </>
                                     )}
-                                    {interview.status === 'cancelled' && (
-                                        <Badge variant="destructive" className="gap-1">
-                                            <XCircle className="size-3" />
-                                            Cancelled
-                                        </Badge>
+                                    {interview.status === 'completed' && (
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            className="h-8 text-xs font-semibold gap-1.5"
+                                            onClick={() => setScorecardInterview(interview)}
+                                        >
+                                            <ClipboardList className="size-3.5" />
+                                            View Scorecard
+                                        </Button>
                                     )}
                                 </div>
-                            </CardContent>
-                            {interview.focusAreas && interview.focusAreas.length > 0 && (
-                                <div className="px-6 pb-6 pt-0 border-t">
-                                    <div className="mt-4 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-primary mb-3">
-                                        <Target className="size-3" />
-                                        AI-Suggested Focus Areas
+                            </div>
+                            
+                            {/* Focus Areas Section */}
+                            {interview.focusAreas && interview.focusAreas.length > 0 && interview.status === 'scheduled' && (
+                                <div className="bg-muted/10 px-5 py-4 border-t border-border/50">
+                                    <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-3">
+                                        <Sparkles className="size-3 text-primary" />
+                                        AI Copilot Focus Areas
                                     </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        {interview.focusAreas.map((area, i) => (
-                                            <div key={i} className="p-3 rounded-lg bg-muted/50 border border-border/50 space-y-2">
-                                                <div className="flex items-start justify-between gap-2">
-                                                    <span className="font-bold text-sm leading-none">{area.topic}</span>
-                                                </div>
-                                                <p className="text-xs text-muted-foreground line-clamp-2">{area.why}</p>
-                                                <div className="pt-2 flex items-start gap-1.5 text-[11px] text-primary/80 font-medium">
-                                                    <HelpCircle className="size-3 shrink-0 mt-0.5" />
+                                    <div className="flex overflow-x-auto gap-3 pb-2 scrollbar-thin scrollbar-thumb-muted-foreground/20">
+                                        {interview.focusAreas.map((area: any, i: number) => (
+                                            <div key={i} className="min-w-[280px] p-3 rounded-lg bg-background border shadow-sm space-y-2 shrink-0">
+                                                <div className="font-semibold text-xs text-foreground leading-tight truncate">{area.topic}</div>
+                                                <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">{area.why}</p>
+                                                <div className="pt-1.5 flex items-start gap-1.5 text-[10px] text-foreground font-medium">
+                                                    <HelpCircle className="size-3 shrink-0 mt-0.5 text-primary opacity-60" />
                                                     <span className="italic">"{area.sample_probe_question}"</span>
                                                 </div>
                                             </div>
@@ -359,67 +375,74 @@ export default function Interviews() {
                                     </div>
                                 </div>
                             )}
-                        </Card>
+                        </div>
                     ))}
                 </div>
             )}
 
             {/* AI Insights Bar */}
-            <div className="bg-primary/5 border border-primary/10 rounded-xl p-6 flex flex-col md:flex-row items-center gap-6">
-                <div className="p-3 bg-primary/10 rounded-lg">
-                    <Sparkles className="size-6 text-primary" />
+            <div className="bg-muted/30 border rounded-xl p-5 flex flex-col md:flex-row items-center gap-5">
+                <div className="p-2.5 bg-background border rounded-md shadow-sm">
+                    <Sparkles className="size-5 text-foreground" />
                 </div>
-                <div className="flex-1">
-                    <h4 className="font-bold text-primary">Interview Copilot enabled</h4>
-                    <p className="text-sm text-muted-foreground mt-0.5">
-                        Our AI has analyzed your candidate shortlist and suggested the best times for technical rounds based on current velocity.
+                <div className="flex-1 text-center md:text-left">
+                    <h4 className="font-semibold text-sm text-foreground">Interview Copilot active</h4>
+                    <p className="text-xs text-muted-foreground mt-1 max-w-2xl">
+                        AI analyzes your candidate shortlist and suggests optimal times for technical rounds based on current team velocity.
                     </p>
                 </div>
-                <div className="flex gap-4">
-                    <div className="text-center">
-                        <div className="text-xl font-bold">84%</div>
-                        <div className="text-[10px] uppercase text-muted-foreground font-semibold">Match Confidence</div>
+                <div className="flex gap-4 items-center shrink-0">
+                    <div className="text-right">
+                        <div className="text-lg font-bold tabular-nums">84%</div>
+                        <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-semibold">Match Confidence</div>
                     </div>
                 </div>
             </div>
 
             {/* Reschedule Dialog */}
             <Dialog open={!!rescheduleData} onOpenChange={(open) => !open && setRescheduleData(null)}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Reschedule Interview</DialogTitle>
-                        <DialogDescription>
-                            Pick a new AI-suggested slot that works better for the team.
-                        </DialogDescription>
-                    </DialogHeader>
+                <DialogContent className="sm:max-w-md p-0 overflow-hidden">
+                    <div className="p-6 pb-4">
+                        <DialogHeader>
+                            <DialogTitle className="text-lg">Reschedule Interview</DialogTitle>
+                            <DialogDescription className="text-xs">
+                                Pick a new AI-suggested slot based on team availability.
+                            </DialogDescription>
+                        </DialogHeader>
+                    </div>
 
-                    <div className="py-4">
+                    <div className="px-6 py-2 bg-muted/20 border-y">
                         {loadingSuggestions ? (
-                            <div className="flex flex-col items-center justify-center p-8 space-y-4">
-                                <RotateCcw className="size-8 text-primary animate-spin" />
-                                <p className="text-sm text-muted-foreground">Finding new available slots...</p>
+                            <div className="flex flex-col items-center justify-center py-10 space-y-4">
+                                <RotateCcw className="size-6 text-muted-foreground animate-spin" />
+                                <p className="text-xs text-muted-foreground font-medium">Scanning calendars...</p>
                             </div>
                         ) : (
-                            <div className="grid gap-3">
+                            <div className="grid gap-2 max-h-[40vh] overflow-y-auto scrollbar-thin scrollbar-thumb-muted-foreground/20 pr-2">
                                 {suggestions.map((slot) => (
                                     <Button
                                         key={slot.startTime}
-                                        variant={selectedSlot === slot.startTime ? "default" : "outline"}
-                                        className="justify-start h-auto py-3 px-4 text-left font-normal"
+                                        variant={selectedSlot === slot.startTime ? "secondary" : "outline"}
+                                        className={cn(
+                                            "justify-start h-auto py-3 px-4 text-left font-normal transition-all",
+                                            selectedSlot === slot.startTime ? "border-foreground/20 bg-muted/50 ring-1 ring-foreground/10" : "hover:border-foreground/20 hover:bg-muted/10 bg-background"
+                                        )}
                                         onClick={() => setSelectedSlot(slot.startTime)}
                                     >
                                         <div className="flex items-center gap-3 w-full">
                                             <div className={cn(
-                                                "size-4 rounded-full border-2 flex items-center justify-center shrink-0",
-                                                selectedSlot === slot.startTime ? "border-primary-foreground bg-primary-foreground" : "border-muted-foreground"
+                                                "size-3.5 rounded-full border flex items-center justify-center shrink-0 transition-colors",
+                                                selectedSlot === slot.startTime ? "border-foreground bg-foreground" : "border-muted-foreground"
                                             )}>
-                                                {selectedSlot === slot.startTime && <div className="size-1.5 rounded-full bg-primary" />}
+                                                {selectedSlot === slot.startTime && <div className="size-1.5 rounded-full bg-background" />}
                                             </div>
-                                            <div className="flex-1">
-                                                <div className="font-bold">{slot.label.split(': ')[1]}</div>
-                                                <div className="text-[10px] opacity-70 uppercase font-semibold">1 Hour Technical Round</div>
+                                            <div className="flex-1 space-y-0.5">
+                                                <div className={cn("text-sm font-semibold", selectedSlot === slot.startTime ? "text-foreground" : "")}>
+                                                    {slot.label.split(': ')[1]}
+                                                </div>
+                                                <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">1 Hour Round</div>
                                             </div>
-                                            <Sparkles className="size-4 text-primary shrink-0 opacity-50" />
+                                            <Sparkles className={cn("size-3.5 shrink-0 transition-opacity", selectedSlot === slot.startTime ? "text-foreground opacity-100" : "text-muted-foreground opacity-50")} />
                                         </div>
                                     </Button>
                                 ))}
@@ -427,31 +450,32 @@ export default function Interviews() {
                         )}
                     </div>
 
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setRescheduleData(null)}>Cancel</Button>
+                    <div className="p-4 flex justify-end gap-2 bg-muted/10">
+                        <Button variant="ghost" size="sm" onClick={() => setRescheduleData(null)}>Cancel</Button>
                         <Button
+                            size="sm"
                             onClick={confirmReschedule}
                             disabled={!selectedSlot || isProcessing}
-                            className="gap-2"
+                            className="gap-2 font-semibold"
                         >
-                            {isProcessing ? <RotateCcw className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
-                            Confirm New Time
+                            {isProcessing ? <RotateCcw className="size-3.5 animate-spin" /> : <CalendarCheck className="size-3.5" />}
+                            Confirm Time
                         </Button>
-                    </DialogFooter>
+                    </div>
                 </DialogContent>
             </Dialog>
 
             {/* Cancel Dialog */}
             <Dialog open={!!cancelId} onOpenChange={(open) => !open && setCancelId(null)}>
-                <DialogContent>
+                <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Cancel Interview</DialogTitle>
+                        <DialogTitle>Cancel Interview?</DialogTitle>
                         <DialogDescription>
-                            Are you sure you want to cancel this interview? This action cannot be undone.
+                            This will notify the candidate and free up the calendar slot. This action cannot be undone.
                         </DialogDescription>
                     </DialogHeader>
-                    <DialogFooter className="mt-4">
-                        <Button variant="outline" onClick={() => setCancelId(null)}>Keep Interview</Button>
+                    <DialogFooter className="mt-4 gap-2 sm:gap-0">
+                        <Button variant="outline" onClick={() => setCancelId(null)}>Keep</Button>
                         <Button
                             variant="destructive"
                             onClick={handleCancel}
@@ -459,7 +483,7 @@ export default function Interviews() {
                             className="gap-2"
                         >
                             {isProcessing ? <RotateCcw className="size-4 animate-spin" /> : <XCircle className="size-4" />}
-                            Yes, Cancel
+                            Cancel Interview
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -478,8 +502,4 @@ export default function Interviews() {
             )}
         </div>
     );
-}
-
-function cn(...inputs: any[]) {
-    return inputs.filter(Boolean).join(' ');
 }

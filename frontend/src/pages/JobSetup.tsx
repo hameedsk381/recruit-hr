@@ -29,7 +29,8 @@ import {
     Database,
     ChevronRight,
     Loader2,
-    ShieldCheck
+    ShieldCheck,
+    Users
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
@@ -50,7 +51,6 @@ export default function JobSetup() {
         campaignFiles: candidateFiles,
         setCampaignFiles: setCandidateFiles
     } = useApp();
-    const [newSkill, setNewSkill] = useState('');
     const [dragOver, setDragOver] = useState(false);
     const [isProcessingBatch, setIsProcessingBatch] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -114,63 +114,70 @@ export default function JobSetup() {
     };
 
     return (
-        <div className="max-w-5xl mx-auto space-y-12 pb-24">
+        <div className="max-w-5xl mx-auto space-y-10 pb-24 px-4 sm:px-6 lg:px-8 animate-in fade-in duration-500">
             {/* Wizard Progress Header */}
-            <div className="flex items-center justify-between border-b pb-8">
-                {(['upload-jd', 'verify-profile', 'bulk-resumes', 'review-launch'] as SetupStep[]).map((s, i) => (
-                    <div key={s} className="flex items-center gap-4 group">
-                        <div className={cn(
-                            "size-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all",
-                            step === s ? "bg-black text-white border-black" : 
-                            (i < ['upload-jd', 'verify-profile', 'bulk-resumes', 'review-launch'].indexOf(step) ? "bg-emerald-500 border-emerald-500 text-white" : "border-muted text-muted-foreground")
-                        )}>
-                            {i < ['upload-jd', 'verify-profile', 'bulk-resumes', 'review-launch'].indexOf(step) ? <Check size={14} /> : i + 1}
+            <div className="flex items-center justify-between border-b border-border/50 pb-6 pt-4">
+                {(['upload-jd', 'verify-profile', 'bulk-resumes', 'review-launch'] as SetupStep[]).map((s, i) => {
+                    const isCompleted = i < ['upload-jd', 'verify-profile', 'bulk-resumes', 'review-launch'].indexOf(step);
+                    const isCurrent = step === s;
+                    
+                    return (
+                        <div key={s} className="flex items-center gap-3 md:gap-4 group">
+                            <div className={cn(
+                                "size-7 rounded-full border flex items-center justify-center text-xs font-semibold transition-all",
+                                isCurrent ? "bg-foreground text-background border-foreground" : 
+                                isCompleted ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600" : 
+                                "border-border/50 text-muted-foreground bg-muted/30"
+                            )}>
+                                {isCompleted ? <Check size={12} className="stroke-[3]" /> : i + 1}
+                            </div>
+                            <span className={cn(
+                                "text-sm font-medium hidden md:block",
+                                isCurrent ? "text-foreground" : 
+                                isCompleted ? "text-foreground" : "text-muted-foreground"
+                            )}>
+                                {s.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                            </span>
+                            {i < 3 && <ChevronRight className="text-muted-foreground/30 hidden md:block mx-1" size={14} />}
                         </div>
-                        <span className={cn(
-                            "text-sm font-medium hidden md:block",
-                            step === s ? "text-foreground" : "text-muted-foreground"
-                        )}>
-                            {s.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
-                        </span>
-                        {i < 3 && <ChevronRight className="text-muted-foreground/30 hidden md:block" size={16} />}
-                    </div>
-                ))}
+                    );
+                })}
             </div>
 
             <AnimatePresence mode="wait">
                 {step === 'upload-jd' && (
                     <motion.div
                         key="step1"
-                        initial={{ opacity: 0, y: 20 }}
+                        initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
+                        exit={{ opacity: 0, y: -10 }}
                         className="space-y-8"
                     >
-                        <div className="text-center space-y-4 py-12">
-                            <h1 className="text-5xl font-bold tracking-tighter">Define the Benchmark.</h1>
-                            <p className="text-muted-foreground text-lg max-w-xl mx-auto">
+                        <div className="text-center space-y-3 py-10">
+                            <h1 className="text-3xl font-bold tracking-tight text-foreground">Define the Benchmark</h1>
+                            <p className="text-sm text-muted-foreground max-w-lg mx-auto">
                                 Upload your technical job description. Our AI will decompose it into granular competencies across India-specific industrial age bands.
                             </p>
                         </div>
 
                         <div 
                             className={cn(
-                                "vercel-card border-dashed !p-20 flex flex-col items-center justify-center text-center space-y-6 transition-all",
-                                dragOver ? "border-black bg-muted" : "hover:border-black/50"
+                                "flex flex-col items-center justify-center text-center p-16 rounded-xl border border-dashed transition-all bg-card/50",
+                                dragOver ? "border-foreground bg-muted/50" : "border-border/60 hover:border-foreground/30"
                             )}
                             onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                             onDragLeave={() => setDragOver(false)}
                             onDrop={async (e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) await processJD(f); }}
                         >
                             <input ref={fileInputRef} type="file" className="hidden" accept=".pdf" onChange={(e) => { const f = e.target.files?.[0]; if (f) processJD(f); }} />
-                            <div className="size-16 rounded-xl bg-black text-white flex items-center justify-center">
-                                {jobLoading ? <Loader2 size={32} className="animate-spin" /> : <Upload size={32} />}
+                            <div className="size-14 rounded-full bg-muted flex items-center justify-center mb-6">
+                                {jobLoading ? <Loader2 size={24} className="animate-spin text-foreground" /> : <Upload size={24} className="text-foreground" />}
                             </div>
-                            <div className="space-y-2">
-                                <h3 className="text-lg font-bold">Upload Role PDF</h3>
-                                <p className="text-sm text-muted-foreground">Standard technical JD files accepted (Max 10MB)</p>
+                            <div className="space-y-1.5 mb-8">
+                                <h3 className="text-base font-semibold text-foreground">Upload Role PDF</h3>
+                                <p className="text-xs text-muted-foreground">Standard technical JD files accepted (Max 10MB)</p>
                             </div>
-                            <Button className="h-11 px-8 rounded-md" onClick={() => fileInputRef.current?.click()} disabled={jobLoading}>
+                            <Button className="h-9 px-6 font-medium" onClick={() => fileInputRef.current?.click()} disabled={jobLoading}>
                                 {jobLoading ? 'Analyzing Blueprint...' : 'Select File'}
                             </Button>
                         </div>
@@ -180,46 +187,49 @@ export default function JobSetup() {
                 {step === 'verify-profile' && job && (
                     <motion.div
                         key="step2"
-                        initial={{ opacity: 0, x: 20 }}
+                        initial={{ opacity: 0, x: 10 }}
                         animate={{ opacity: 1, x: 0 }}
-                        className="space-y-8"
+                        className="space-y-6"
                     >
-                        <div className="flex justify-between items-center">
-                            <h2 className="text-3xl font-bold tracking-tight">Technical Blueprint</h2>
-                            <Button className="gap-2" onClick={() => setStep('bulk-resumes')}>
-                                Continue to Sourcing <ArrowRight size={16} />
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div className="space-y-1">
+                                <h2 className="text-xl font-bold tracking-tight text-foreground">Technical Blueprint</h2>
+                                <p className="text-sm text-muted-foreground">Verify and adjust the extracted requirements.</p>
+                            </div>
+                            <Button className="gap-2 shrink-0" onClick={() => setStep('bulk-resumes')} size="sm">
+                                Continue to Sourcing <ArrowRight size={14} />
                             </Button>
                         </div>
 
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             <div className="lg:col-span-2 space-y-6">
-                                <div className="vercel-card space-y-6">
-                                    <div className="grid grid-cols-2 gap-6">
+                                <div className="vercel-card space-y-6 bg-card">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                         <div className="space-y-2">
-                                            <Label className="text-[10px] font-bold uppercase text-muted-foreground">Role Title</Label>
-                                            <Input value={job.title} onChange={(e) => setJob({...job, title: e.target.value})} className="h-10 rounded-md" />
+                                            <Label className="text-xs font-semibold text-foreground">Role Title</Label>
+                                            <Input value={job.title} onChange={(e) => setJob({...job, title: e.target.value})} className="h-9" />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label className="text-[10px] font-bold uppercase text-muted-foreground">Organization</Label>
-                                            <Input value={job.company} onChange={(e) => setJob({...job, company: e.target.value})} className="h-10 rounded-md" />
+                                            <Label className="text-xs font-semibold text-foreground">Organization</Label>
+                                            <Input value={job.company} onChange={(e) => setJob({...job, company: e.target.value})} className="h-9" />
                                         </div>
                                     </div>
-                                    <div className="space-y-4">
-                                        <Label className="text-[10px] font-bold uppercase text-muted-foreground">Extracted Competency Matrix</Label>
-                                        <div className="divide-y border rounded-md">
+                                    <div className="space-y-3">
+                                        <Label className="text-xs font-semibold text-foreground">Extracted Competency Matrix</Label>
+                                        <div className="divide-y border border-border/60 rounded-md overflow-hidden">
                                             {job.core_skills.map((s, i) => (
-                                                <div key={i} className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors group">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className={cn("size-2 rounded-full", s.mandatory ? "bg-red-500" : "bg-emerald-500")} />
-                                                        <span className="text-sm font-medium">{s.skill}</span>
+                                                <div key={i} className="p-3 flex flex-wrap sm:flex-nowrap items-center justify-between hover:bg-muted/30 transition-colors group gap-3">
+                                                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                                        <div className={cn("size-2 rounded-full shrink-0", s.mandatory ? "bg-red-500" : "bg-emerald-500")} />
+                                                        <span className="text-sm font-medium text-foreground truncate">{s.skill}</span>
                                                     </div>
-                                                    <div className="flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <div className="flex items-center gap-3 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
                                                         <Select value={s.weight} onValueChange={(val) => {
                                                             const core_skills = [...job.core_skills];
                                                             core_skills[i].weight = val as any;
                                                             setJob({...job, core_skills});
                                                         }}>
-                                                            <SelectTrigger className="h-8 w-32 text-[10px] font-bold uppercase">
+                                                            <SelectTrigger className="h-7 w-28 text-xs font-medium">
                                                                 <SelectValue />
                                                             </SelectTrigger>
                                                             <SelectContent>
@@ -228,9 +238,11 @@ export default function JobSetup() {
                                                                 <SelectItem value="nice_to_have">Nice to have</SelectItem>
                                                             </SelectContent>
                                                         </Select>
-                                                        <button className="text-muted-foreground hover:text-red-500" onClick={() => {
+                                                        <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={() => {
                                                             setJob({...job, core_skills: job.core_skills.filter((_, idx) => idx !== i)});
-                                                        }}><Trash2 size={14} /></button>
+                                                        }}>
+                                                            <Trash2 size={14} />
+                                                        </Button>
                                                     </div>
                                                 </div>
                                             ))}
@@ -239,20 +251,25 @@ export default function JobSetup() {
                                 </div>
                             </div>
                             <div className="space-y-6">
-                                <div className="vercel-card bg-zinc-950 text-white border-none shadow-2xl">
-                                    <h3 className="text-[10px] font-black uppercase text-zinc-500 mb-4">Industrial Intelligence</h3>
-                                    <div className="space-y-6">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-sm font-medium">Req. Tenure</span>
-                                            <div className="flex items-center gap-2">
-                                                <button className="size-6 border border-zinc-700 rounded flex items-center justify-center hover:bg-zinc-800 transition-colors" onClick={() => setJob({...job, experience_expectations: {...job.experience_expectations, min_years: Math.max(0, job.experience_expectations.min_years - 1)}})}>-</button>
-                                                <span className="font-bold">{job.experience_expectations.min_years}y</span>
-                                                <button className="size-6 border border-zinc-700 rounded flex items-center justify-center hover:bg-zinc-800 transition-colors" onClick={() => setJob({...job, experience_expectations: {...job.experience_expectations, min_years: job.experience_expectations.min_years + 1}})}>+</button>
+                                <div className="vercel-card bg-zinc-950 text-zinc-100 border-none relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-4 opacity-10">
+                                        <Target className="size-24" />
+                                    </div>
+                                    <h3 className="text-xs font-semibold text-zinc-400 mb-5 flex items-center gap-2 relative z-10">
+                                        <Target className="size-3.5" /> Industrial Intelligence
+                                    </h3>
+                                    <div className="space-y-6 relative z-10">
+                                        <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
+                                            <span className="text-sm font-medium text-zinc-300">Target Experience</span>
+                                            <div className="flex items-center gap-3">
+                                                <button className="size-6 rounded-md bg-zinc-800 flex items-center justify-center hover:bg-zinc-700 transition-colors text-zinc-300" onClick={() => setJob({...job, experience_expectations: {...job.experience_expectations, min_years: Math.max(0, job.experience_expectations.min_years - 1)}})}>-</button>
+                                                <span className="font-semibold text-sm w-4 text-center">{job.experience_expectations.min_years}y</span>
+                                                <button className="size-6 rounded-md bg-zinc-800 flex items-center justify-center hover:bg-zinc-700 transition-colors text-zinc-300" onClick={() => setJob({...job, experience_expectations: {...job.experience_expectations, min_years: job.experience_expectations.min_years + 1}})}>+</button>
                                             </div>
                                         </div>
-                                        <div className="p-3 bg-zinc-900 rounded-md border border-white/10 space-y-2">
-                                            <p className="text-[9px] font-black uppercase text-zinc-500">AI Assumption</p>
-                                            <p className="text-xs text-zinc-400 italic">"Detected senior-level autonomy requirements. Pricing benchmarked at Tier-1 INR compensation."</p>
+                                        <div className="p-3 bg-zinc-900 rounded-lg border border-zinc-800 space-y-1.5">
+                                            <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider flex items-center gap-1.5"><Zap size={10} className="text-amber-500" /> AI Insights</p>
+                                            <p className="text-xs text-zinc-400 leading-relaxed">Detected senior-level autonomy requirements. Pricing benchmarked at Tier-1 INR compensation.</p>
                                         </div>
                                     </div>
                                 </div>
@@ -266,24 +283,24 @@ export default function JobSetup() {
                         key="step3"
                         initial={{ opacity: 0, scale: 0.98 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="space-y-8"
+                        className="space-y-6"
                     >
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div>
-                                <h2 className="text-3xl font-bold tracking-tight">Resource Pipeline</h2>
-                                <p className="text-muted-foreground">Upload candidates to process against the technical blueprint.</p>
+                            <div className="space-y-1">
+                                <h2 className="text-xl font-bold tracking-tight text-foreground">Resource Pipeline</h2>
+                                <p className="text-sm text-muted-foreground">Upload candidates to process against the technical blueprint.</p>
                             </div>
-                            <div className="flex gap-4">
-                                <Button variant="ghost" onClick={() => setStep('verify-profile')}>Back</Button>
-                                <Button className="gap-2" disabled={candidateFiles.length === 0} onClick={() => setStep('review-launch')}>
-                                    Final Review <ArrowRight size={16} />
+                            <div className="flex gap-3">
+                                <Button variant="outline" size="sm" onClick={() => setStep('verify-profile')}>Back</Button>
+                                <Button className="gap-2" size="sm" disabled={candidateFiles.length === 0} onClick={() => setStep('review-launch')}>
+                                    Final Review <ArrowRight size={14} />
                                 </Button>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
                             <div 
-                                className="vercel-card border-dashed flex flex-col items-center justify-center p-16 text-center space-y-4 hover:border-black transition-all cursor-pointer"
+                                className="md:col-span-3 border border-dashed rounded-xl flex flex-col items-center justify-center p-12 text-center space-y-4 hover:border-foreground/30 transition-all cursor-pointer bg-card/50"
                                 onClick={() => resumeInputRef.current?.click()}
                             >
                                 <input 
@@ -291,32 +308,37 @@ export default function JobSetup() {
                                     type="file" 
                                     multiple 
                                     className="hidden" 
+                                    accept=".pdf"
                                     onChange={(e) => {
                                         const files = Array.from(e.target.files || []);
                                         setCandidateFiles([...candidateFiles, ...files]);
                                     }}
                                 />
-                                <div className="size-12 rounded-lg bg-black text-white flex items-center justify-center">
-                                    <Database size={24} />
+                                <div className="size-12 rounded-full bg-muted flex items-center justify-center">
+                                    <Database size={20} className="text-muted-foreground" />
                                 </div>
-                                <h3 className="font-bold">Add Resumes</h3>
-                                <p className="text-xs text-muted-foreground">Select multiple PDFs to start bulk ingestion.</p>
+                                <div className="space-y-1">
+                                    <h3 className="font-semibold text-sm text-foreground">Add Resumes</h3>
+                                    <p className="text-xs text-muted-foreground max-w-[200px] mx-auto">Select multiple PDFs to start bulk ingestion.</p>
+                                </div>
                             </div>
 
-                            <div className="vercel-card h-[300px] overflow-y-auto">
-                                <div className="flex items-center justify-between mb-4 border-b pb-4 sticky top-0 bg-card">
-                                    <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Queue Selection ({candidateFiles.length})</h3>
-                                    <button className="text-[10px] font-bold text-red-500" onClick={() => setCandidateFiles([])}>Clear All</button>
+                            <div className="vercel-card md:col-span-2 h-[350px] flex flex-col p-0 overflow-hidden bg-card">
+                                <div className="flex items-center justify-between p-4 border-b bg-card">
+                                    <h3 className="text-xs font-semibold text-foreground flex items-center gap-2">
+                                        Queue <span className="px-1.5 py-0.5 rounded bg-muted text-[10px]">{candidateFiles.length}</span>
+                                    </h3>
+                                    <button className="text-[10px] font-semibold text-destructive hover:underline" onClick={() => setCandidateFiles([])} disabled={candidateFiles.length === 0}>Clear All</button>
                                 </div>
-                                <div className="space-y-2">
+                                <div className="flex-1 overflow-y-auto p-2">
                                     {candidateFiles.map((f, i) => (
-                                        <div key={i} className="flex items-center justify-between p-2 rounded hover:bg-muted text-xs font-medium group">
-                                            <div className="flex items-center gap-2">
-                                                <FileText size={14} className="text-muted-foreground" />
-                                                <span className="truncate max-w-[200px]">{f.name}</span>
+                                        <div key={i} className="flex items-center justify-between p-2 rounded-md hover:bg-muted text-xs font-medium group transition-colors">
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                                <FileText size={14} className="text-muted-foreground shrink-0" />
+                                                <span className="truncate">{f.name}</span>
                                             </div>
                                             <button 
-                                                className="text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100"
+                                                className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity p-1"
                                                 onClick={() => setCandidateFiles(candidateFiles.filter((_, idx) => idx !== i))}
                                             >
                                                 <Trash2 size={12} />
@@ -324,9 +346,9 @@ export default function JobSetup() {
                                         </div>
                                     ))}
                                     {candidateFiles.length === 0 && (
-                                        <div className="flex flex-col items-center justify-center h-40 opacity-20">
-                                            <Database size={32} />
-                                            <p className="text-[10px] font-bold uppercase mt-2">Queue Empty</p>
+                                        <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3 opacity-60">
+                                            <Database size={24} />
+                                            <span className="text-xs font-medium">Queue is empty</span>
                                         </div>
                                     )}
                                 </div>
@@ -338,69 +360,72 @@ export default function JobSetup() {
                 {step === 'review-launch' && job && (
                     <motion.div
                         key="step4"
-                        initial={{ opacity: 0, y: 20 }}
+                        initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="max-w-2xl mx-auto space-y-12 py-12"
+                        className="max-w-2xl mx-auto space-y-8 py-8"
                     >
-                        <div className="text-center space-y-4">
-                            <h2 className="text-4xl font-bold tracking-tighter">Execute Deployment.</h2>
-                            <p className="text-muted-foreground">Verify the batch parameters before authorizing the AI cluster to initiate evaluation.</p>
+                        <div className="text-center space-y-2">
+                            <h2 className="text-2xl font-bold tracking-tight text-foreground">Execute Deployment</h2>
+                            <p className="text-sm text-muted-foreground">Verify the batch parameters before initiating evaluation.</p>
                         </div>
 
-                        <div className="vercel-card divide-y !p-0">
-                            <div className="p-6 flex justify-between items-center">
+                        <div className="vercel-card divide-y bg-card !p-0">
+                            <div className="p-5 flex justify-between items-center bg-card">
                                 <div className="space-y-1">
-                                    <p className="text-[10px] font-bold text-muted-foreground uppercase">Target Role</p>
-                                    <p className="font-bold">{job.title}</p>
+                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Target Role</p>
+                                    <p className="font-semibold text-sm">{job.title}</p>
                                 </div>
                                 <div className="text-right space-y-1">
-                                    <p className="text-[10px] font-bold text-muted-foreground uppercase">Organization</p>
-                                    <p className="font-bold">{job.company}</p>
+                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Organization</p>
+                                    <p className="font-semibold text-sm">{job.company}</p>
                                 </div>
                             </div>
-                            <div className="p-6 flex justify-between items-center">
+                            <div className="p-5 flex justify-between items-center bg-card">
                                 <div className="space-y-1">
-                                    <p className="text-[10px] font-bold text-muted-foreground uppercase">Batch Size</p>
-                                    <p className="font-bold">{candidateFiles.length} Candidates</p>
+                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Batch Size</p>
+                                    <p className="font-semibold text-sm flex items-center gap-1.5"><Users size={14} className="text-muted-foreground" /> {candidateFiles.length} Candidates</p>
                                 </div>
                                 <div className="text-right space-y-1">
-                                    <p className="text-[10px] font-bold text-muted-foreground uppercase">Compliance Gate</p>
-                                    <p className="font-bold text-emerald-500 flex items-center gap-1 justify-end">
+                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Compliance</p>
+                                    <p className="font-semibold text-sm text-emerald-600 flex items-center gap-1.5 justify-end">
                                         <ShieldCheck size={14} /> DPDP-2023 Valid
                                     </p>
                                 </div>
                             </div>
-                            <div className="p-6 bg-muted/20">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <Zap size={14} className="text-amber-500" />
-                                    <span className="text-[10px] font-black uppercase text-amber-500">Resource Estimation</span>
+                            <div className="p-5 bg-muted/30">
+                                <div className="flex items-center gap-2 mb-1.5">
+                                    <Zap size={12} className="text-amber-500" />
+                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex-1">Processing Estimation</span>
+                                    <span className="text-xs font-semibold text-foreground">~{Math.ceil(candidateFiles.length * 1.5)} mins</span>
                                 </div>
-                                <p className="text-xs text-muted-foreground leading-relaxed italic">
-                                    Processing this batch will take approximately {Math.ceil(candidateFiles.length * 1.5)} minutes. Data will be cached in the regional Indian cluster for 30 days.
+                                <div className="w-full bg-muted rounded-full h-1.5 mb-2">
+                                    <div className="bg-amber-500 h-1.5 rounded-full w-1/3"></div>
+                                </div>
+                                <p className="text-[10px] text-muted-foreground leading-relaxed">
+                                    Data will be processed securely and cached in regional clusters for 30 days.
                                 </p>
                             </div>
                         </div>
 
-                        <div className="flex flex-col gap-4">
+                        <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                             <Button variant="outline" className="h-10" onClick={() => setStep('bulk-resumes')}>Back to Sourcing</Button>
                             <Button 
-                                className="h-14 rounded-md text-lg font-bold gap-3 shadow-2xl shadow-black/20" 
-                                size="lg" 
+                                className="h-10 text-sm font-medium gap-2 sm:flex-1" 
                                 onClick={handleLaunchBatch}
                                 disabled={isProcessingBatch}
                             >
                                 {isProcessingBatch ? (
                                     <>
-                                        <Loader2 size={24} className="animate-spin" />
-                                        Authorizing Sovereign Cluster...
+                                        <Loader2 size={16} className="animate-spin" />
+                                        Processing Batch...
                                     </>
                                 ) : (
                                     <>
-                                        Authorize & Deploy {candidateFiles.length} Candidates
-                                        <ArrowRight size={20} />
+                                        Deploy Batch Evaluation
+                                        <ArrowRight size={16} />
                                     </>
                                 )}
                             </Button>
-                            <Button variant="ghost" className="h-12" onClick={() => setStep('bulk-resumes')}>Back to Sourcing</Button>
                         </div>
                     </motion.div>
                 )}

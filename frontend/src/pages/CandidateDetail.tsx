@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import api from '../api/client';
-import { Card, CardContent } from "@/components/ui/card";
 import {
     ArrowLeft,
     ChevronLeft,
@@ -194,98 +193,100 @@ export default function CandidateDetail() {
             <main className="grid grid-cols-1 lg:grid-cols-3 gap-12">
                 <div className="lg:col-span-2 space-y-12">
                     {/* Identity & Core Metrics */}
-                    <div className="space-y-6">
-                        <div className="flex justify-between items-start">
-                            <div>
-                                <h1 className="text-5xl font-bold tracking-tighter">{profile.name}</h1>
-                                <p className="text-lg text-muted-foreground mt-2 font-medium">
-                                    {profile.recent_role?.title} • {profile.recent_role?.company}
+                    <div className="space-y-8">
+                        <div className="flex justify-between items-start gap-6">
+                            <div className="space-y-2">
+                                <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-foreground">{profile.name}</h1>
+                                <p className="text-lg text-muted-foreground font-medium">
+                                    {profile.recent_role?.title || 'Candidate Profile'} {profile.recent_role?.company ? `• ${profile.recent_role?.company}` : ''}
                                 </p>
                             </div>
-                            <div className={cn(
-                                "size-20 rounded-xl flex flex-col items-center justify-center border-2",
-                                assessment.fit_assessment.overall_fit === 'high' ? "border-emerald-500 bg-emerald-500/5 text-emerald-600" :
-                                assessment.fit_assessment.overall_fit === 'medium' ? "border-amber-500 bg-amber-500/5 text-amber-600" :
-                                "border-blue-500 bg-blue-500/5 text-blue-600"
-                            )}>
-                                <span className="text-4xl font-black">{assessment.fit_assessment.overall_fit === 'high' ? 'A+' : assessment.fit_assessment.overall_fit === 'medium' ? 'B' : 'C'}</span>
-                                <span className="text-[8px] font-bold uppercase tracking-widest mt-0.5">Match</span>
+                            <div className="flex flex-col items-center justify-center text-center">
+                                <div className={cn(
+                                    "size-20 rounded-xl flex items-center justify-center border-2 mb-2 shadow-sm",
+                                    assessment.fit_assessment.overall_fit === 'high' ? "border-emerald-500 bg-emerald-500/10 text-emerald-600" :
+                                    assessment.fit_assessment.overall_fit === 'medium' ? "border-amber-500 bg-amber-500/10 text-amber-600" :
+                                    "border-blue-500 bg-blue-500/10 text-blue-600"
+                                )}>
+                                    <span className="text-4xl font-black">{assessment.fit_assessment.overall_fit === 'high' ? 'A+' : assessment.fit_assessment.overall_fit === 'medium' ? 'B' : 'C'}</span>
+                                </div>
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Match Rating</span>
                             </div>
                         </div>
 
-                        <div className="flex flex-wrap gap-8 pt-6 border-t">
-                            <div className="space-y-1">
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Industrial Tenure</p>
-                                <p className="text-xl font-bold">{profile.experience_estimate?.total_years || '0'} Years</p>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-6 pt-6 border-t border-border/50">
+                            <div className="space-y-1.5">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"><Clock size={12} /> Industrial Tenure</p>
+                                <p className="text-xl font-bold tabular-nums text-foreground">{profile.experience_estimate?.total_years || '0'} Years</p>
                             </div>
-                            <div className="space-y-1">
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Competency Cloud</p>
-                                <p className="text-xl font-bold">{profile.extracted_skills.length} Nodes</p>
+                            <div className="space-y-1.5">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"><Activity size={12} /> Competency Cloud</p>
+                                <p className="text-xl font-bold tabular-nums text-foreground">{profile.extracted_skills.length} Nodes</p>
                             </div>
-                            <div className="space-y-1">
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Compliance ID</p>
-                                <p className="text-xl font-mono text-xs opacity-40">{candidate.id.split('-')[0]}</p>
+                            <div className="space-y-1.5">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"><ShieldAlert size={12} /> Compliance ID</p>
+                                <p className="text-lg font-mono text-muted-foreground">{candidate.id.split('-')[0]}</p>
                             </div>
                         </div>
                     </div>
 
                     {/* AI Analysis Sections */}
-                    <div className="space-y-12">
+                    <div className="space-y-10">
                         <section className="space-y-4">
-                            <h3 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                            <h3 className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2 text-foreground">
                                 <Sparkles size={16} /> Semantic Assessment
                             </h3>
-                            <div className="vercel-card bg-muted/30 border-none">
-                                <p className="text-xl font-medium leading-relaxed italic">"{assessment.one_line_summary}"</p>
+                            <div className="vercel-card bg-muted/40 border-border/50 shadow-sm">
+                                <p className="text-lg font-medium leading-relaxed italic text-foreground">"{assessment.one_line_summary}"</p>
                                 {assessment.fit_assessment.reasoning && (
-                                    <p className="mt-6 text-sm text-muted-foreground leading-relaxed border-t pt-6">{assessment.fit_assessment.reasoning}</p>
+                                    <p className="mt-5 text-sm text-muted-foreground leading-relaxed border-t border-border/60 pt-5">{assessment.fit_assessment.reasoning}</p>
                                 )}
                             </div>
                         </section>
 
-                        <div className="grid md:grid-cols-2 gap-8">
+                        <div className="grid md:grid-cols-2 gap-6">
                             <div className="space-y-4">
-                                <h4 className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 text-emerald-600">
+                                <h4 className="text-[10px] font-semibold uppercase tracking-wider flex items-center gap-2 text-emerald-600">
                                     <ThumbsUp size={14} /> Critical Strengths
                                 </h4>
                                 <div className="space-y-3">
                                     {assessment.strengths.map((s, i) => (
-                                        <div key={i} className="vercel-card !p-4 border-none bg-emerald-500/[0.03]">
-                                            <p className="font-bold text-sm">{s.skill}</p>
-                                            <p className="text-xs text-muted-foreground mt-1">{s.evidence}</p>
+                                        <div key={i} className="vercel-card !p-4 border-emerald-500/10 bg-emerald-500/5 shadow-sm">
+                                            <p className="font-semibold text-sm text-foreground">{s.skill}</p>
+                                            <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">{s.evidence}</p>
                                         </div>
                                     ))}
                                 </div>
                             </div>
                             <div className="space-y-4">
-                                <h4 className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 text-amber-600">
+                                <h4 className="text-[10px] font-semibold uppercase tracking-wider flex items-center gap-2 text-amber-600">
                                     <AlertCircle size={14} /> Strategic Gaps
                                 </h4>
                                 <div className="space-y-3">
                                     {assessment.gaps_and_risks.map((r, i) => (
-                                        <div key={i} className="vercel-card !p-4 border-none bg-amber-500/[0.03]">
-                                            <p className="font-bold text-sm">{r.area}</p>
-                                            <p className="text-xs text-muted-foreground mt-1">{r.explanation}</p>
+                                        <div key={i} className="vercel-card !p-4 border-amber-500/10 bg-amber-500/5 shadow-sm">
+                                            <p className="font-semibold text-sm text-foreground">{r.area}</p>
+                                            <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">{r.explanation}</p>
                                         </div>
                                     ))}
                                 </div>
                             </div>
                         </div>
 
-                        <section className="space-y-4">
-                            <h3 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                        <section className="space-y-4 pb-8">
+                            <h3 className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2 text-foreground">
                                 <Target size={16} /> Requirement Alignment
                             </h3>
-                            <div className="divide-y border rounded-md">
+                            <div className="vercel-card !p-0 divide-y divide-border/50 shadow-sm overflow-hidden">
                                 {assessment.skill_match_breakdown.map((s, i) => (
-                                    <div key={i} className="p-4 flex items-center justify-between group hover:bg-muted/30">
-                                        <div className="space-y-0.5">
-                                            <p className="text-sm font-bold">{s.required_skill}</p>
-                                            <p className="text-xs text-muted-foreground">{s.notes}</p>
+                                    <div key={i} className="p-4 flex items-center justify-between group hover:bg-muted/30 transition-colors">
+                                        <div className="space-y-1 pr-6">
+                                            <p className="text-sm font-semibold text-foreground">{s.required_skill}</p>
+                                            <p className="text-xs text-muted-foreground line-clamp-2 md:line-clamp-none">{s.notes}</p>
                                         </div>
                                         <Badge variant="outline" className={cn(
-                                            "text-[9px] font-bold uppercase tracking-widest px-2 py-0.5",
-                                            s.candidate_coverage === 'strong' ? "border-emerald-500 text-emerald-600" : "border-muted text-muted-foreground"
+                                            "shrink-0 text-[10px] font-semibold uppercase tracking-wider px-2.5 py-0.5",
+                                            s.candidate_coverage === 'strong' ? "border-emerald-500/50 text-emerald-700 bg-emerald-500/10" : "border-border text-muted-foreground bg-muted/50"
                                         )}>
                                             {s.candidate_coverage}
                                         </Badge>
@@ -299,20 +300,20 @@ export default function CandidateDetail() {
                 {/* Right Sidebar - Action Context */}
                 <div className="space-y-8">
                     {/* ATS Sync Card */}
-                    <Card className="rounded-3xl border-2 bg-card/40 backdrop-blur-md overflow-hidden shadow-none">
-                        <div className="p-5 border-b bg-muted/30">
-                            <h3 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                                <Database size={12} /> ATS Ecosystem Sync
+                    <div className="vercel-card !p-0 overflow-hidden bg-card/60 shadow-sm border-border/70 backdrop-blur-md">
+                        <div className="p-4 border-b border-border/50 bg-muted/40">
+                            <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                                <Database size={12} /> Ecosystem Sync
                             </h3>
                         </div>
-                        <CardContent className="p-5 space-y-4">
-                            <p className="text-[10px] text-muted-foreground font-medium leading-relaxed">
-                                Authorize deployment of this assessment blueprint to your talent operating system.
+                        <div className="p-5 space-y-4">
+                            <p className="text-xs text-muted-foreground font-medium leading-relaxed">
+                                Deploy this assessment blueprint to your talent operating system.
                             </p>
-                            <div className="grid grid-cols-1 gap-2">
+                            <div className="grid grid-cols-1 gap-2.5">
                                 <Button 
                                     variant="outline" 
-                                    className="justify-between h-10 rounded-xl text-[10px] font-black uppercase tracking-widest border-emerald-500/20 hover:bg-emerald-500/5 hover:text-emerald-600 transition-all group"
+                                    className="justify-between h-9 rounded-md text-[10px] font-semibold uppercase tracking-wider border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 hover:text-emerald-700 hover:border-emerald-500/50 transition-all group"
                                     onClick={async () => {
                                         try {
                                             const res = await api.atsSync({
@@ -327,11 +328,11 @@ export default function CandidateDetail() {
                                     }}
                                 >
                                     Push to Zoho Recruit
-                                    <ChevronRight size={12} className="opacity-40 group-hover:translate-x-0.5 transition-transform" />
+                                    <ChevronRight size={14} className="opacity-40 group-hover:translate-x-0.5 group-hover:opacity-100 transition-all text-emerald-600" />
                                 </Button>
                                 <Button 
                                     variant="outline" 
-                                    className="justify-between h-10 rounded-xl text-[10px] font-black uppercase tracking-widest border-indigo-500/20 hover:bg-indigo-500/5 hover:text-indigo-600 transition-all group"
+                                    className="justify-between h-9 rounded-md text-[10px] font-semibold uppercase tracking-wider border-indigo-500/30 bg-indigo-500/5 hover:bg-indigo-500/10 hover:text-indigo-700 hover:border-indigo-500/50 transition-all group"
                                     onClick={async () => {
                                         try {
                                             const res = await api.atsSync({
@@ -346,26 +347,26 @@ export default function CandidateDetail() {
                                     }}
                                 >
                                     Sync to Darwinbox
-                                    <ChevronRight size={12} className="opacity-40 group-hover:translate-x-0.5 transition-transform" />
+                                    <ChevronRight size={14} className="opacity-40 group-hover:translate-x-0.5 group-hover:opacity-100 transition-all text-indigo-600" />
                                 </Button>
                             </div>
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </div>
 
-                    <div className="space-y-6">
-                        <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                            <Activity size={16} /> Workflow Stage
+                    <div className="vercel-card !p-5 space-y-5 bg-card shadow-sm border-border/70">
+                        <h4 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                            <Activity size={14} /> Workflow Stage
                         </h4>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-2 xl:grid-cols-3 gap-2">
                             {(['applied', 'shortlisted', 'technical', 'culture', 'pending', 'offer'] as const).map(s => (
                                 <button
                                     key={s}
                                     onClick={() => updateCandidateStage(candidate.id, s)}
                                     className={cn(
-                                        "text-center px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border",
+                                        "text-center px-2 py-2 rounded-md text-[10px] font-semibold uppercase tracking-wider transition-all border",
                                         candidate.stage === s 
-                                            ? "bg-black text-white border-black" 
-                                            : "bg-muted/50 border-transparent hover:border-black/20"
+                                            ? "bg-foreground text-background border-foreground shadow-sm" 
+                                            : "bg-muted/30 text-muted-foreground border-border/50 hover:border-border hover:bg-muted/70 hover:text-foreground"
                                     )}
                                 >
                                     {s}
@@ -374,58 +375,56 @@ export default function CandidateDetail() {
                         </div>
                     </div>
 
-                    <div className="space-y-6">
-                        <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                            <MoreHorizontal size={16} /> Contact Nodes
+                    <div className="vercel-card !p-5 space-y-4 bg-card shadow-sm border-border/70">
+                        <h4 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                            <MoreHorizontal size={14} /> Contact Nodes
                         </h4>
-                        <div className="space-y-2">
-                            {profile.email && <div className="text-xs font-medium border rounded-xl px-4 py-3 flex items-center justify-between hover:bg-muted cursor-pointer truncate"><span>{profile.email}</span><Mail size={12} className="opacity-40" /></div>}
-                            {profile.phone && <div className="text-xs font-medium border rounded-xl px-4 py-3 flex items-center justify-between hover:bg-muted cursor-pointer"><span>{profile.phone}</span><Phone size={12} className="opacity-40" /></div>}
+                        <div className="space-y-2.5">
+                            {profile.email && <div className="text-xs font-medium border border-border/60 rounded-md px-3.5 py-2.5 flex items-center justify-between hover:bg-muted/40 cursor-pointer truncate transition-colors text-foreground"><span className="truncate pr-4">{profile.email}</span><Mail size={14} className="opacity-40 shrink-0" /></div>}
+                            {profile.phone && <div className="text-xs font-medium border border-border/60 rounded-md px-3.5 py-2.5 flex items-center justify-between hover:bg-muted/40 cursor-pointer transition-colors text-foreground"><span>{profile.phone}</span><Phone size={14} className="opacity-40 shrink-0" /></div>}
+                            {(!profile.email && !profile.phone) && <div className="text-xs text-muted-foreground italic text-center py-2">No contact information available</div>}
                         </div>
                     </div>
 
-                    <div className="pt-6 border-t space-y-4">
-                        <h3 className="text-[10px] font-black uppercase tracking-widest text-red-500">Compliance & Privacy</h3>
-                        <div className="space-y-2">
-                            <Button 
-                                variant="outline" 
-                                className="w-full justify-start h-10 rounded-xl text-[10px] font-black uppercase tracking-widest text-red-500 border-red-500/10 hover:bg-red-500/5 group"
-                                onDoubleClick={async () => {
-                                    if (confirm("DPDP: Irreversibly erase this profile's PII and interview traces?")) {
-                                        await api.deleteCandidateData(candidate.id);
-                                        setView('shortlist');
-                                    }
-                                }}
-                            >
-                                <ShieldAlert size={14} className="mr-2" /> 
-                                Right to Erasure
-                            </Button>
-                        </div>
+                    <div className="pt-2">
+                        <Button 
+                            variant="outline" 
+                            className="w-full justify-start h-10 rounded-md text-xs font-semibold text-destructive border-destructive/20 bg-destructive/5 hover:bg-destructive hover:text-destructive-foreground transition-all group"
+                            onClick={async () => {
+                                if (confirm("DPDP: Irreversibly erase this profile's PII and interview traces?")) {
+                                    await api.deleteCandidateData(candidate.id);
+                                    setView('shortlist');
+                                }
+                            }}
+                        >
+                            <ShieldAlert size={14} className="mr-2 opacity-70 group-hover:opacity-100" /> 
+                            Right to Erasure (DPDP)
+                        </Button>
                     </div>
                 </div>
             </main>
 
             {/* Dialogs */}
             <Dialog open={isScheduling} onOpenChange={setIsScheduling}>
-                <DialogContent className="rounded-xl border-none shadow-2xl p-0 overflow-hidden max-w-sm">
+                <DialogContent className="rounded-xl border-border/40 shadow-2xl p-0 overflow-hidden max-w-sm bg-card">
                     <div className="p-8 space-y-6">
-                        <div className="space-y-2">
-                            <h3 className="text-2xl font-bold tracking-tight">Technical Loop</h3>
-                            <p className="text-xs text-muted-foreground">Select an AI-calibrated window for evaluation.</p>
+                        <div className="space-y-2 flex flex-col items-center text-center">
+                            <h3 className="text-xl font-bold tracking-tight text-foreground">Technical Loop</h3>
+                            <p className="text-xs text-muted-foreground font-medium">Select an AI-calibrated window for evaluation.</p>
                         </div>
-                        {loadingSuggestions ? <div className="py-12 flex justify-center"><Loader2 size={24} className="animate-spin" /></div> : (
+                        {loadingSuggestions ? <div className="py-12 flex justify-center"><Loader2 size={24} className="animate-spin text-foreground opacity-50" /></div> : (
                             <div className="space-y-2">
                                 {suggestions.map(s => (
-                                    <div key={s.startTime} className={cn("p-4 border rounded-lg cursor-pointer hover:bg-muted transition-all", selectedSlot === s.startTime && "border-black bg-black text-white")} onClick={() => setSelectedSlot(s.startTime)}>
-                                        <p className="text-sm font-bold">{new Date(s.startTime).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}</p>
-                                        <p className="text-[10px] opacity-60 font-medium">{new Date(s.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                    <div key={s.startTime} className={cn("p-4 border border-border/60 rounded-md cursor-pointer hover:bg-muted/40 transition-all text-center", selectedSlot === s.startTime && "border-foreground bg-foreground text-background shadow-md")} onClick={() => setSelectedSlot(s.startTime)}>
+                                        <p className="text-sm font-semibold">{new Date(s.startTime).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}</p>
+                                        <p className="text-[10px] opacity-70 font-semibold uppercase tracking-wider mt-0.5">{new Date(s.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                                     </div>
                                 ))}
                             </div>
                         )}
-                        <div className="flex gap-2">
-                            <Button variant="ghost" className="flex-1 rounded" onClick={() => setIsScheduling(false)}>Cancel</Button>
-                            <Button className="flex-1 rounded" disabled={!selectedSlot} onClick={handleSchedule}>Launch</Button>
+                        <div className="flex gap-2.5 pt-2">
+                            <Button variant="outline" className="flex-1 font-semibold rounded-md h-9 border-border/60" onClick={() => setIsScheduling(false)}>Cancel</Button>
+                            <Button className="flex-1 font-semibold rounded-md h-9 shadow-sm" disabled={!selectedSlot} onClick={handleSchedule}>Launch</Button>
                         </div>
                     </div>
                 </DialogContent>

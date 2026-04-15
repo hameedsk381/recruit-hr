@@ -198,19 +198,21 @@ export default function Shortlist() {
 
     if (candidates.length === 0 && !candidatesLoading) {
         return (
-            <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-6 text-center py-20 px-4">
-                <div className="size-16 rounded-xl border flex items-center justify-center bg-muted/30">
-                    <Database size={32} className="text-muted-foreground" />
+            <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 animate-in fade-in duration-500">
+                <div className="text-center space-y-6 max-w-md w-full">
+                    <div className="size-16 rounded-xl border border-dashed border-border flex items-center justify-center bg-muted/30 text-muted-foreground mx-auto">
+                        <Database size={24} />
+                    </div>
+                    <div className="space-y-2">
+                        <h1 className="text-2xl font-bold tracking-tight text-foreground">Expand the pipeline</h1>
+                        <p className="text-sm text-muted-foreground max-w-[280px] mx-auto">Upload candidate resumes to initiate AI-powered ranking and assessment.</p>
+                    </div>
+                    <input ref={fileInputRef} type="file" multiple accept=".pdf" className="hidden" onChange={handleFilesUpload} />
+                    <Button className="w-full h-10 font-medium" onClick={() => fileInputRef.current?.click()}>
+                        <Upload size={16} className="mr-2" />
+                        Upload Candidates
+                    </Button>
                 </div>
-                <div className="space-y-2">
-                    <h1 className="text-4xl font-bold tracking-tight">Expand the pipeline.</h1>
-                    <p className="text-muted-foreground max-w-sm mx-auto">Upload resumes to initiate AI-powered ranking and assessment.</p>
-                </div>
-                <input ref={fileInputRef} type="file" multiple accept=".pdf" className="hidden" onChange={handleFilesUpload} />
-                <Button size="lg" className="h-12 px-8 rounded-md" onClick={() => fileInputRef.current?.click()}>
-                    <Upload size={18} className="mr-2" />
-                    Upload Candidate Batch
-                </Button>
             </div>
         );
     }
@@ -229,63 +231,82 @@ export default function Shortlist() {
 
     if (candidatesLoading) {
         return (
-            <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-12">
-                <div className="flex flex-col items-center gap-4">
-                    <div className="size-8 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                    <div className="text-center space-y-2">
-                        <h2 className="text-2xl font-bold tracking-tight">Synthesizing Results...</h2>
-                        <p className="text-sm text-muted-foreground animate-pulse leading-relaxed">Decomposing experience vectors and skill density...</p>
+            <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 animate-in fade-in duration-500">
+                <div className="max-w-md w-full space-y-8">
+                    <div className="flex flex-col items-center justify-center text-center space-y-4">
+                        <div className="size-10 border-2 border-foreground border-t-transparent rounded-full animate-spin opacity-50" />
+                        <div className="space-y-1">
+                            <h2 className="text-xl font-bold tracking-tight text-foreground">Synthesizing Results</h2>
+                            <p className="text-sm text-muted-foreground animate-pulse">Decomposing experience vectors and skill density...</p>
+                        </div>
+                    </div>
+                    
+                    {uploadProgress && (
+                        <div className="p-6 rounded-xl border border-border/50 bg-card space-y-4 shadow-sm">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                                    <Activity size={12} className="text-foreground" />
+                                    Processing Batch
+                                </span>
+                                <span className="text-xs font-semibold tabular-nums text-foreground">{Math.round((uploadProgress.current / uploadProgress.total) * 100)}%</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                                <motion.div 
+                                    initial={{ width: 0 }} 
+                                    animate={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }} 
+                                    className="h-full bg-foreground transition-all duration-500" 
+                                />
+                            </div>
+                        </div>
+                    )}
+                    
+                    <div className="flex justify-center pt-4">
+                        <Button variant="ghost" className="text-muted-foreground hover:text-destructive text-xs font-semibold uppercase tracking-wider h-8" onClick={handleCancelBatch}>
+                            Cancel Processing
+                        </Button>
                     </div>
                 </div>
-                {uploadProgress && (
-                    <div className="w-full max-w-sm space-y-3">
-                        <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                            <span>Processing Batch</span>
-                            <span>{Math.round((uploadProgress.current / uploadProgress.total) * 100)}%</span>
-                        </div>
-                        <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
-                            <motion.div initial={{ width: 0 }} animate={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }} className="h-full bg-black transition-all duration-500" />
-                        </div>
-                    </div>
-                )}
-                <Button variant="outline" onClick={handleCancelBatch} className="text-red-500 border-red-200 hover:bg-red-50">
-                    Cancel Processing
-                </Button>
             </div>
         );
     }
 
     return (
-        <div className="space-y-12 animate-in fade-in duration-500">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-                <div className="space-y-2">
-                    <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-                        <Users size={32} />
+        <div className="container mx-auto max-w-6xl px-4 py-8 space-y-8 animate-in fade-in duration-500">
+            {/* Header section */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-border/50 pb-6">
+                <div className="space-y-1">
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+                        <Users className="size-6" />
                         Candidate Pipeline
                     </h1>
                     {job && (
                         <p className="text-sm text-muted-foreground">
-                            Processing for <span className="text-foreground font-medium">{job.title}</span> at <span className="font-medium">{job.company}</span>
+                            Processing for <span className="font-semibold text-foreground">{job.title}</span> at <span className="font-medium">{job.company}</span>
                         </p>
                     )}
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                     <input ref={fileInputRef} type="file" multiple accept=".pdf" className="hidden" onChange={handleFilesUpload} />
-                    <Button variant="outline" size="sm" className="h-9 px-4 rounded-md" onClick={() => fileInputRef.current?.click()}>Add to Batch</Button>
-                    <Button variant={copilot.isOpen ? "secondary" : "default"} size="sm" className="h-9 px-4 rounded-md" onClick={toggleCopilot}>
-                        <Brain size={16} className={cn("mr-2", copilot.isOpen && "animate-pulse")} />
+                    <Button variant="outline" size="sm" className="h-9 px-4 font-medium sm:flex-1 md:flex-none" onClick={() => fileInputRef.current?.click()}>
+                        <Upload size={14} className="mr-2" />
+                        Add Candidates
+                    </Button>
+                    <Button variant={copilot.isOpen ? "secondary" : "default"} size="sm" className="h-9 px-4 font-medium sm:flex-1 md:flex-none" onClick={toggleCopilot}>
+                        <Brain size={14} className={cn("mr-2", copilot.isOpen && "animate-pulse")} />
                         Talent Copilot
                     </Button>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-                <aside className="lg:col-span-1 border-r pr-8 space-y-8">
-                    <div className="space-y-6">
-                        <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                {/* Sidebar Filters */}
+                <aside className="lg:col-span-1 space-y-8">
+                    <div className="p-5 rounded-xl border border-border/50 bg-card space-y-6 shadow-sm">
+                        <h4 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                             <Filter size={14} /> Filter & Sort
                         </h4>
-                        <div className="space-y-4">
+                        <div className="space-y-2">
+                            <label className="text-xs font-medium text-foreground">Sort By</label>
                             <Select value={sortBy} onValueChange={(val: any) => setSortBy(val)}>
                                 <SelectTrigger className="h-9 text-xs">
                                     <SelectValue />
@@ -297,109 +318,154 @@ export default function Shortlist() {
                                 </SelectContent>
                             </Select>
                         </div>
-                        <div className="space-y-3">
-                            {['high', 'medium', 'low'].map(level => (
-                                <div key={level} className="flex items-center justify-between group cursor-pointer" onClick={() => {
+                        
+                        <div className="space-y-3 pt-2">
+                            <label className="text-xs font-medium text-foreground mb-1 block">Fit Potential</label>
+                            {['high', 'medium', 'low'].map((level) => (
+                                <div key={level} className="flex items-center justify-between group cursor-pointer hover:bg-muted/50 p-1.5 -mx-1.5 rounded-md transition-colors" onClick={() => {
                                     if (filters.fitLevel.includes(level)) {
                                         setFilters(f => ({ ...f, fitLevel: f.fitLevel.filter(l => l !== level) }));
                                     } else {
                                         setFilters(f => ({ ...f, fitLevel: [...f.fitLevel, level] }));
                                     }
                                 }}>
-                                    <div className="flex items-center gap-3">
-                                        <div className={cn("size-2 rounded-full", level === 'high' ? "bg-emerald-500" : level === 'medium' ? "bg-amber-500" : "bg-blue-500")} />
-                                        <span className="text-xs font-medium capitalize">{level} Potential</span>
+                                    <div className="flex items-center gap-2.5">
+                                        <div className={cn("size-2 rounded-full shadow-sm", level === 'high' ? "bg-emerald-500" : level === 'medium' ? "bg-amber-500" : "bg-blue-500")} />
+                                        <span className="text-xs font-semibold capitalize text-foreground">{level} Fit</span>
                                     </div>
-                                    <Checkbox checked={filters.fitLevel.includes(level)} className="rounded" />
+                                    <Checkbox checked={filters.fitLevel.includes(level)} className="rounded shadow-none border-muted-foreground/30 data-[state=checked]:bg-foreground data-[state=checked]:border-foreground" />
                                 </div>
                             ))}
                         </div>
                     </div>
 
-                    <div className="pt-8 border-t space-y-6">
-                        <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                    <div className="p-5 rounded-xl border border-border/50 bg-card space-y-6 shadow-sm">
+                        <h4 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                             <Activity size={14} /> Pipeline Stats
                         </h4>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="vercel-card !p-3 text-center border-none bg-muted/30">
-                                <p className="text-lg font-bold">{stats.total}</p>
-                                <p className="text-[9px] font-black uppercase text-muted-foreground">Total</p>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="rounded-lg bg-muted/40 p-3 text-center border border-border/30">
+                                <p className="text-xl font-bold text-foreground tracking-tight tabular-nums">{stats.total}</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mt-0.5">Total</p>
                             </div>
-                            <div className="vercel-card !p-3 text-center border-none bg-emerald-500/5">
-                                <p className="text-lg font-bold text-emerald-600">{stats.high}</p>
-                                <p className="text-[9px] font-black uppercase text-emerald-500">Tier 1</p>
+                            <div className="rounded-lg bg-emerald-500/10 p-3 text-center border border-emerald-500/20">
+                                <p className="text-xl font-bold text-emerald-700 tracking-tight tabular-nums">{stats.high}</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 mt-0.5">Tier 1</p>
                             </div>
                         </div>
                     </div>
                 </aside>
 
-                <main className="lg:col-span-3 space-y-4">
+                {/* Candidate List */}
+                <main className="lg:col-span-3 space-y-4 pb-12">
                     <LayoutGroup>
                         <AnimatePresence mode="popLayout">
                             {visibleCandidates.map((candidate) => (
                                 <motion.div
                                     key={candidate.id}
                                     layout
-                                    initial={{ opacity: 0, x: 10 }}
-                                    animate={{ opacity: 1, x: 0 }}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, scale: 0.98 }}
                                     className="group relative"
                                     onClick={() => selectCandidate(candidate.id)}
                                 >
                                     <div className={cn(
-                                        "vercel-card !p-0 overflow-hidden flex cursor-pointer",
-                                        candidate.pinned && "border-blue-500 border-2"
+                                        "vercel-card !p-0 flex cursor-pointer transition-all border-l-[3px]",
+                                        candidate.pinned ? "border-foreground shadow-md ring-1 ring-border/50" : "hover:border-foreground/30 hover:shadow-sm",
+                                        candidate.assessment.fit_assessment.overall_fit === 'high' ? "border-l-emerald-500" :
+                                        candidate.assessment.fit_assessment.overall_fit === 'medium' ? "border-l-amber-500" : "border-l-blue-500"
                                     )}>
-                                        <div className={cn(
-                                            "w-1 shrink-0",
-                                            candidate.assessment.fit_assessment.overall_fit === 'high' ? "bg-emerald-500" :
-                                            candidate.assessment.fit_assessment.overall_fit === 'medium' ? "bg-amber-500" : "bg-blue-500"
-                                        )} />
-                                        <div className="flex-1 p-6 flex flex-col md:flex-row items-center justify-between gap-6">
-                                            <div className="flex-1 min-w-0 space-y-1">
+                                        <div className="flex-1 p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-5 bg-card">
+                                            
+                                            <div className="flex-1 min-w-0 space-y-2">
                                                 <div className="flex items-center gap-3">
-                                                    <h3 className="text-lg font-bold truncate">{candidate.profile.name}</h3>
-                                                    {candidate.pinned && <Badge variant="secondary" className="px-1.5 py-0 rounded font-bold text-[9px] uppercase tracking-tighter">Pinned</Badge>}
+                                                    <h3 className="text-base font-semibold truncate text-foreground">{candidate.profile.name}</h3>
+                                                    {candidate.pinned && <Badge variant="secondary" className="px-1.5 py-0 h-5 rounded font-semibold text-[10px] uppercase tracking-wider bg-foreground/10 text-foreground border-none">Pinned</Badge>}
                                                 </div>
-                                                <p className="text-sm text-muted-foreground line-clamp-1">{candidate.assessment.one_line_summary}</p>
-                                                <div className="flex items-center gap-4 pt-2">
-                                                    <div className="flex gap-2">
+                                                <p className="text-sm text-muted-foreground line-clamp-1 pr-4">{candidate.assessment.one_line_summary}</p>
+                                                
+                                                <div className="flex items-center gap-3 pt-1">
+                                                    <Badge variant="outline" className="text-[10px] uppercase font-semibold tracking-wider text-muted-foreground border-border/60">
+                                                        Rank #{candidate.rank}
+                                                    </Badge>
+                                                    <div className="flex flex-wrap gap-1.5">
                                                         {candidate.assessment.strengths.slice(0, 2).map((s, i) => (
-                                                            <span key={i} className="text-[10px] font-bold text-muted-foreground border rounded px-1.5 py-0.5 bg-muted/20">{s.skill}</span>
+                                                            <span key={i} className="text-[10px] font-medium text-foreground/80 bg-muted px-2 py-0.5 rounded-md border border-border/50">
+                                                                {s.skill}
+                                                            </span>
                                                         ))}
                                                     </div>
-                                                    <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">#Rank {candidate.rank}</span>
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-8 shrink-0">
-                                                <div className="flex flex-col items-center">
+                                            
+                                            <div className="flex items-center gap-6 shrink-0 w-full md:w-auto justify-between md:justify-end border-t md:border-none pt-4 md:pt-0 pb-1 md:pb-0 border-border/40 mt-2 md:mt-0">
+                                                <div className="flex flex-col md:items-center w-12">
                                                     <div className={cn(
-                                                        "text-xl font-black",
+                                                        "text-lg font-bold tabular-nums",
                                                         candidate.assessment.fit_assessment.overall_fit === 'high' ? "text-emerald-600" :
                                                         candidate.assessment.fit_assessment.overall_fit === 'medium' ? "text-amber-600" : "text-blue-600"
                                                     )}>
                                                         {candidate.assessment.fit_assessment.overall_fit === 'high' ? 'A+' :
                                                          candidate.assessment.fit_assessment.overall_fit === 'medium' ? 'B' : 'C'}
                                                     </div>
-                                                    <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground opacity-50">Match</span>
+                                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Match</span>
                                                 </div>
-                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <Button variant="ghost" size="icon" className="size-8" onClick={(e) => { e.stopPropagation(); pinCandidate(candidate.id); }}>
-                                                        <Pin size={14} className={cn(candidate.pinned && "fill-current")} />
+                                                <div className="flex items-center gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-foreground" onClick={(e) => { e.stopPropagation(); pinCandidate(candidate.id); }}>
+                                                        <Pin size={14} className={cn(candidate.pinned && "fill-foreground")} />
                                                     </Button>
-                                                    <Button variant="ghost" size="icon" className="size-8 hover:text-red-500" onClick={(e) => { e.stopPropagation(); setRemoveModalId(candidate.id); }}>
+                                                    <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={(e) => { e.stopPropagation(); setRemoveModalId(candidate.id); }}>
                                                         <Trash2 size={14} />
                                                     </Button>
+                                                    <ChevronRight size={16} className="text-muted-foreground/30 hidden md:block ml-2" />
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
                                 </motion.div>
                             ))}
+                            {visibleCandidates.length === 0 && (
+                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center p-12 text-center rounded-xl border border-dashed border-border bg-card/50">
+                                   <Search size={32} className="text-muted-foreground/50 mb-4" />
+                                   <h3 className="text-lg font-semibold text-foreground">No matches found</h3>
+                                   <p className="text-sm text-muted-foreground mt-1">Try adjusting your filters or upload more resumes.</p>
+                                   <Button variant="outline" size="sm" className="mt-6 font-medium" onClick={() => { setFilters({ fitLevel: [], showRemoved: false }); setSortBy('rank'); }}>
+                                       Clear Filters
+                                   </Button>
+                                </motion.div>
+                            )}
                         </AnimatePresence>
                     </LayoutGroup>
                 </main>
             </div>
+            
+            {/* Remove Modal */}
+            <Dialog open={!!removeModalId} onOpenChange={(open) => !open && setRemoveModalId(null)}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-bold text-foreground">Remove Candidate</DialogTitle>
+                        <DialogDescription className="text-sm text-muted-foreground">
+                            This will move the candidate to the archive. They won't appear in the active pipeline.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <label className="text-xs font-semibold text-foreground">Reason for removal</label>
+                            <Textarea 
+                                placeholder="E.g., Missing core requirements, outside budget..."
+                                value={removeReason}
+                                onChange={(e) => setRemoveReason(e.target.value)}
+                                className="resize-none h-24"
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="ghost" className="font-medium" onClick={() => setRemoveModalId(null)}>Cancel</Button>
+                        <Button variant="destructive" className="font-medium" onClick={handleRemove}>Confirm Removal</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

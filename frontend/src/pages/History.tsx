@@ -11,8 +11,10 @@ import {
     Users, 
     CheckCircle2, 
     AlertCircle, 
-    Layers 
+    Layers,
+    History as HistoryIcon
 } from 'lucide-react';
+import { cn } from "@/lib/utils";
 
 export default function History() {
     const { setView, loadCampaign } = useApp();
@@ -52,27 +54,27 @@ export default function History() {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-[calc(100vh-100px)]">
-                <div className="flex flex-col items-center gap-4">
-                    <div className="size-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-                    <p className="text-muted-foreground font-medium animate-pulse">Retrieving Talent History…</p>
-                </div>
+                <div className="animate-spin size-8 border-2 border-foreground border-t-transparent rounded-full opacity-50" />
             </div>
         );
     }
 
     return (
-        <div className="container mx-auto px-4 py-8 space-y-8 animate-in fade-in duration-500">
-            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-black tracking-tight font-outfit uppercase">Search History</h1>
-                    <p className="text-muted-foreground font-medium">Review and restore previous talent acquisition batches.</p>
+        <div className="container mx-auto max-w-5xl px-4 py-8 space-y-8 animate-in fade-in duration-500">
+            <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                <div className="space-y-1">
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+                        <HistoryIcon className="size-6" />
+                        Campaign History
+                    </h1>
+                    <p className="text-sm text-muted-foreground">Review and restore previous talent acquisition batches.</p>
                 </div>
-                <div className="relative w-full md:w-64">
+                <div className="relative w-full md:w-72">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                     <input 
                         type="text" 
-                        placeholder="Search jobs…"
-                        className="w-full pl-10 pr-4 py-2 bg-background border rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all"
+                        placeholder="Search campaigns…"
+                        className="w-full pl-9 pr-4 py-2 bg-background border rounded-md text-sm focus:ring-1 focus:ring-foreground outline-none transition-all placeholder:text-muted-foreground"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -80,66 +82,65 @@ export default function History() {
             </header>
 
             {filteredHistory.length === 0 ? (
-                <Card className="border-2 border-dashed rounded-[2.5rem] p-16 flex flex-col items-center justify-center text-center space-y-6">
-                    <div className="p-6 bg-muted rounded-full">
-                        <Layers className="size-12 text-muted-foreground opacity-40" />
+                <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 rounded-xl border border-dashed border-border/60 bg-muted/20">
+                    <div className="p-4 bg-muted/50 rounded-full">
+                        <Layers className="size-10 text-muted-foreground/60" />
                     </div>
-                    <div className="max-w-md">
-                        <h3 className="text-2xl font-black">No History Yet</h3>
-                        <p className="text-muted-foreground mt-2 font-medium">Once you start matching resumes, your previous batches will appear here for easy access.</p>
+                    <div className="max-w-xs space-y-1.5">
+                        <h3 className="text-sm font-semibold text-foreground">No History Yet</h3>
+                        <p className="text-xs text-muted-foreground leading-relaxed">Once you start matching resumes, your previous batches will appear here for easy access.</p>
                     </div>
-                    <Button onClick={() => setView('setup')} className="rounded-xl h-12 px-8 font-black uppercase tracking-widest text-xs">Start New Search</Button>
-                </Card>
+                    <Button onClick={() => setView('setup')} size="sm" className="mt-2 text-xs font-semibold">Start New Search</Button>
+                </div>
             ) : (
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 gap-3">
                     {filteredHistory.map((item) => (
-                        <Card 
+                        <div 
                             key={item.id} 
-                            className="rounded-3xl border-2 hover:border-primary/30 transition-all group hover:shadow-xl hover:shadow-primary/5 cursor-pointer overflow-hidden"
+                            className="vercel-card !p-0 overflow-hidden hover:border-foreground/20 group cursor-pointer transition-all bg-card"
                             onClick={() => handleLoadBatch(item.id)}
                         >
-                            <CardContent className="p-0">
-                                <div className="flex flex-col md:flex-row">
-                                    <div className="p-6 flex-1 space-y-4">
-                                        <div className="flex items-start justify-between">
-                                            <div className="space-y-1">
-                                                <h3 className="text-xl font-bold group-hover:text-primary transition-colors">{item.title}</h3>
-                                                <div className="flex items-center gap-3 text-sm text-muted-foreground font-medium">
-                                                    <span className="flex items-center gap-1.5 font-bold">
-                                                        <Clock size={14} className="text-primary/60" />
-                                                        {new Date(item.date).toLocaleDateString(undefined, { 
-                                                            month: 'short', 
-                                                            day: 'numeric', 
-                                                            year: 'numeric' 
-                                                        })}
-                                                    </span>
-                                                    <span className="size-1 bg-muted-foreground/30 rounded-full" />
-                                                    <span className="flex items-center gap-1.5 font-bold">
-                                                        <Users size={14} className="text-primary/60" />
-                                                        {item.candidateCount} Candidates
-                                                    </span>
-                                                </div>
+                            <div className="flex flex-col md:flex-row items-center">
+                                <div className="p-5 flex-1 space-y-3 min-w-0 w-full">
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div className="space-y-1.5 min-w-0 flex-1">
+                                            <h3 className="text-base font-semibold text-foreground truncate group-hover:text-primary transition-colors">{item.title}</h3>
+                                            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground font-medium">
+                                                <span className="flex items-center gap-1.5">
+                                                    <Clock size={14} className="opacity-70" />
+                                                    {new Date(item.date).toLocaleDateString(undefined, { 
+                                                        month: 'short', 
+                                                        day: 'numeric', 
+                                                        year: 'numeric' 
+                                                    })}
+                                                </span>
+                                                <span className="size-1 bg-border rounded-full" />
+                                                <span className="flex items-center gap-1.5">
+                                                    <Users size={14} className="opacity-70" />
+                                                    {item.candidateCount} Candidates
+                                                </span>
                                             </div>
-                                            <Badge 
-                                                variant={item.status === 'COMPLETED' ? 'secondary' : 'outline'}
-                                                className={`rounded-full px-3 py-1 font-black uppercase text-[9px] tracking-widest ${
-                                                    item.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-orange-500/10 text-orange-600 border-orange-500/20'
-                                                }`}
-                                            >
-                                                {item.status === 'COMPLETED' ? (
-                                                    <span className="flex items-center gap-1"><CheckCircle2 size={10} /> Processed</span>
-                                                ) : (
-                                                    <span className="flex items-center gap-1"><AlertCircle size={10} /> {item.status}</span>
-                                                )}
-                                            </Badge>
                                         </div>
-                                    </div>
-                                    <div className="md:w-16 bg-muted/30 border-t md:border-t-0 md:border-l flex items-center justify-center group-hover:bg-primary/5 transition-colors">
-                                        <ChevronRight className="text-muted-foreground group-hover:text-primary transition-transform group-hover:translate-x-1" />
+                                        <Badge 
+                                            variant={item.status === 'COMPLETED' ? 'secondary' : 'outline'}
+                                            className={cn(
+                                                "shrink-0 h-6 px-2.5 text-[10px] uppercase tracking-wider font-semibold border-none",
+                                                item.status === 'COMPLETED' ? "bg-emerald-500/10 text-emerald-700" : "bg-amber-500/10 text-amber-700"
+                                            )}
+                                        >
+                                            {item.status === 'COMPLETED' ? (
+                                                <span className="flex items-center gap-1"><CheckCircle2 size={12} /> Processed</span>
+                                            ) : (
+                                                <span className="flex items-center gap-1"><AlertCircle size={12} /> {item.status}</span>
+                                            )}
+                                        </Badge>
                                     </div>
                                 </div>
-                            </CardContent>
-                        </Card>
+                                <div className="hidden md:flex w-16 self-stretch border-l border-border/50 bg-muted/10 items-center justify-center group-hover:bg-muted/30 transition-colors">
+                                    <ChevronRight className="size-5 text-muted-foreground group-hover:text-foreground transition-all group-hover:translate-x-0.5" />
+                                </div>
+                            </div>
+                        </div>
                     ))}
                 </div>
             )}
