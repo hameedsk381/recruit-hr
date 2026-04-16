@@ -1,6 +1,7 @@
 import { extractResumeData } from '../services/resumeExtractor';
+import { AuthContext } from '../middleware/authMiddleware';
 
-export async function resumeExtractHandler(req: Request): Promise<Response> {
+export async function resumeExtractHandler(req: Request, context: AuthContext): Promise<Response> {
   try {
     const formData = await req.formData();
     const file = formData.get('resume');
@@ -19,7 +20,7 @@ export async function resumeExtractHandler(req: Request): Promise<Response> {
     }
     
     const buffer = await file.arrayBuffer();
-    const resumeData = await extractResumeData(Buffer.from(buffer));
+    const resumeData = await extractResumeData(Buffer.from(buffer), context.tenantId);
     
     return new Response(
       JSON.stringify({ 

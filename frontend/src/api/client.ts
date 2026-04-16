@@ -38,6 +38,16 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     return response.json();
 }
 
+/**
+ * Generic request wrapper matching the 'apiClient' signature expected by many pages.
+ */
+export const apiClient = {
+    get: <T>(url: string, headers?: any) => request<T>(url, { method: 'GET', headers }),
+    post: <T>(url: string, body: any, headers?: any) => request<T>(url, { method: 'POST', body, headers }),
+    patch: <T>(url: string, body: any, headers?: any) => request<T>(url, { method: 'PATCH', body, headers }),
+    delete: <T>(url: string, headers?: any) => request<T>(url, { method: 'DELETE', headers }),
+};
+
 async function uploadFiles(
     endpoint: string,
     files: { [key: string]: File | File[] },
@@ -460,6 +470,22 @@ export const api = {
 
     revokeAPIKey: (id: string) =>
         request<{ success: boolean }>(`/v1/auth/api-keys/${id}`, { method: 'DELETE' }),
+
+    // ── Phase 4: Enterprise ───────────────────────────────────────────────
+    listWorkflows: () =>
+        request<{ success: boolean; workflows: any[] }>('/v1/workflows'),
+
+    createWorkflow: (data: any) =>
+        request<{ success: boolean; id: string }>('/v1/workflows', { method: 'POST', body: data }),
+
+    generateReport: (config: any) =>
+        request<any>('/v1/reports/generate', { method: 'POST', body: config }),
+
+    listOnboarding: () =>
+        request<{ success: boolean; records: any[] }>('/v1/onboarding'),
+
+    initiateOnboarding: (data: any) =>
+        request<{ success: boolean; id: string }>('/v1/onboarding/initiate', { method: 'POST', body: data }),
 };
 
 export default api;

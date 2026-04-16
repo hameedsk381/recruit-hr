@@ -289,7 +289,8 @@ export async function multipleJobMatchHandler(req: Request, context: AuthContext
       resumeFiles,
       jdUrls,
       resumeUrls,
-      jdDataList
+      jdDataList,
+      tenantId: context.tenantId
     };
 
     const matchResults = await matchMultipleJDsWithMultipleResumes(input, requestId);

@@ -2,6 +2,7 @@ import { Queue, Worker, Job } from 'bullmq';
 import { Redis } from 'ioredis';
 import { NotificationService } from './notificationService';
 import { getMongoDb } from '../utils/mongoClient';
+import { AutomationEngine } from './automationEngine';
 
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
@@ -11,7 +12,14 @@ export let workflowWorker: Worker;
 const createRedisConnection = () => {
     return new Redis(REDIS_URL, {
         maxRetriesPerRequest: null,
-        enableOfflineQueue: true // Allow brief offline queuing for horizontal scaling stability
+        enableOfflineQueue: true,
+        connectTimeout: 20000, // 20 seconds for remote
+        reconnectOnError: (err) => {
+            const targetError = 'READONLY';
+            if (err.message.includes(targetError)) return true;
+            return false;
+        },
+        retryStrategy: (times) => Math.min(times * 1000, 10000)
     }) as any;
 };
 
@@ -42,6 +50,7 @@ export function initializeWorkflow() {
             console.log(`[WorkflowWorker] Processing event: ${type} for tenant ${tenantId}`);
 
             try {
+                // 1. Core Logic (Legacy)
                 switch (type) {
                     case 'CANDIDATE_SHORTLISTED':
                         await handleCandidateShortlisted(tenantId, payload);
@@ -53,6 +62,10 @@ export function initializeWorkflow() {
                         await handleInterviewConfirmed(tenantId, payload);
                         break;
                 }
+
+                // 2. Dynamic Automations (Phase 4)
+                await AutomationEngine.executeWorkflow(tenantId, type, payload);
+
             } catch (error) {
                 console.error(`[WorkflowWorker] Error processing job ${job.id}:`, error);
                 throw error;

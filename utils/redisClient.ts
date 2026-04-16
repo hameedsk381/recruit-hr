@@ -10,7 +10,12 @@ export async function initializeRedisClient(): Promise<void> {
     const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
     
     redisClient = createClient({
-      url: redisUrl
+      url: redisUrl,
+      socket: {
+        connectTimeout: 20000, // 20 seconds
+        reconnectStrategy: (retries) => Math.min(retries * 500, 5000)
+      },
+      commandsQueueMaxLength: 10000
     });
 
     // Add error handling

@@ -2,8 +2,9 @@ import { generateMCQQuestions } from '../services/mcqGenerator';
 import { extractJobDescriptionData } from '../services/jdExtractor';
 import { extractResumeData } from '../services/resumeExtractor';
 import { downloadFileFromUrl, isValidUrl } from '../utils/fileDownloader';
+import { AuthContext } from '../middleware/authMiddleware';
 
-export async function mcqGenerateHandler(req: Request): Promise<Response> {
+export async function mcqGenerateHandler(req: Request, context: AuthContext): Promise<Response> {
   try {
     const contentType = req.headers.get('content-type') || '';
     let jdBuffer: Buffer;
@@ -173,7 +174,7 @@ export async function mcqGenerateHandler(req: Request): Promise<Response> {
     
     // Extract data from buffers
     const jdData = await extractJobDescriptionData(jdBuffer);
-    const resumeData = await extractResumeData(resumeBuffer);
+    const resumeData = await extractResumeData(resumeBuffer, context.tenantId);
     
     // Generate MCQ questions
     const questions = await generateMCQQuestions(jdData, resumeData);

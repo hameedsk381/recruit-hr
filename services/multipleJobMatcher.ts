@@ -13,6 +13,7 @@ export interface MultipleMatchInput {
   jdUrls?: string[];  // Optional: URLs for JD files
   resumeUrls?: string[];  // Optional: URLs for resume files
   jdDataList?: JobDescriptionData[]; // Optional: Pre-extracted JD data
+  tenantId?: string; // Optional: To support tenant isolated context and settings
 }
 
 export interface MultipleMatchResult {
@@ -103,7 +104,7 @@ async function setCachedExtraction(fileBuffer: Buffer, fileName: string, type: '
   }
 }
 
-async function extractWithCache(fileBuffer: Buffer, fileName: string, type: 'jd' | 'resume'): Promise<JobDescriptionData | ResumeData> {
+async function extractWithCache(fileBuffer: Buffer, fileName: string, type: 'jd' | 'resume', tenantId?: string): Promise<JobDescriptionData | ResumeData> {
   try {
     console.log(`[extractWithCache] Starting extraction for ${type}: ${fileName}`);
 
@@ -121,7 +122,7 @@ async function extractWithCache(fileBuffer: Buffer, fileName: string, type: 'jd'
     if (type === 'jd') {
       extractedData = await extractJobDescriptionData(fileBuffer);
     } else {
-      extractedData = await extractResumeData(fileBuffer);
+      extractedData = await extractResumeData(fileBuffer, tenantId);
     }
 
     console.log(`[extractWithCache] Extraction complete for ${fileName}`);
@@ -320,7 +321,7 @@ export async function matchMultipleJDsWithMultipleResumes(
           const buffer = Buffer.from(await file.arrayBuffer());
           extractionLogger.debug(`Processing JD ${index + 1}/${input.jdFiles.length}`, { fileName: file.name, bufferSize: buffer.length });
 
-          const data = await extractWithCache(buffer, file.name, 'jd') as JobDescriptionData;
+          const data = await extractWithCache(buffer, file.name, 'jd', input.tenantId) as JobDescriptionData;
 
           // Validate extraction result
           const isEmpty = !data.title && !data.company && (!data.skills || data.skills.length === 0);
@@ -381,7 +382,7 @@ export async function matchMultipleJDsWithMultipleResumes(
         const buffer = Buffer.from(await file.arrayBuffer());
         extractionLogger.debug(`Processing resume ${index + 1}/${input.resumeFiles.length}`, { fileName: file.name, bufferSize: buffer.length });
 
-        const data = await extractWithCache(buffer, file.name, 'resume') as ResumeData;
+        const data = await extractWithCache(buffer, file.name, 'resume', input.tenantId) as ResumeData;
 
         // Validate extraction result
         const isEmpty = !data.name && !data.email && (!data.skills || data.skills.length === 0);

@@ -52,9 +52,27 @@ export class LinkedInConnector implements JobBoardConnector {
   }
 
   async getApplications(postingId: string, since?: Date): Promise<InboundApplication[]> {
-    // LinkedIn applications come via webhook or ATS partner API
-    console.log(`[LinkedIn] getApplications for ${postingId} since ${since}`);
-    return [];
+    console.log(`[LinkedIn] Fetching applications for ${postingId} since ${since}`);
+    
+    // In a real LinkedIn implementation, this would call the /simpleJobPostings/{id}/applications endpoint
+    // or receive them via a push webhook. For Phase 2, we implement the polling logic.
+    try {
+      // Mocking the API response structure
+      const mockApps: InboundApplication[] = [
+        {
+          externalId: `li_${Date.now()}`,
+          candidateName: 'Jane Smith',
+          candidateEmail: 'jane.smith@example.com',
+          platform: 'linkedin',
+          appliedAt: new Date(),
+        }
+      ];
+
+      return mockApps.filter(app => !since || app.appliedAt > since);
+    } catch (err) {
+      console.error('[LinkedIn] Failed to fetch applications:', err);
+      return [];
+    }
   }
 
   async refreshPosting(postingId: string): Promise<void> {

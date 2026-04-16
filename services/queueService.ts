@@ -57,7 +57,7 @@ export const assessmentWorker = new Worker(
             }
             
             const buffer = Buffer.isBuffer(bufferData) ? bufferData : Buffer.from(bufferData as number[]);
-            const rawResumeData = await extractResumeData(buffer);
+            const rawResumeData = await extractResumeData(buffer, tenantId);
             const matchResult = await matchJobWithResume(jdData, rawResumeData);
 
             const result = {

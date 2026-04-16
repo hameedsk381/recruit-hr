@@ -1,72 +1,128 @@
-import { getMongoDb } from '../utils/mongoClient';
-import { getRedisClient } from '../utils/redisClient';
+import { getMongoDb } from "../utils/mongoClient";
+import { getRedisClient } from "../utils/redisClient";
+import { autoRoutedChatCompletion } from "../services/llmRouter";
 
-async function checkMongo(): Promise<'healthy' | 'unhealthy'> {
-  try {
-    const db = getMongoDb();
-    await db.command({ ping: 1 });
-    return 'healthy';
-  } catch {
-    return 'unhealthy';
-  }
+/**
+ * Check MongoDB health
+ */
+async function checkMongo(): Promise<string> {
+    try {
+        const db = getMongoDb();
+        await db.command({ ping: 1 });
+        return "healthy";
+    } catch (error) {
+        console.error("[Health] MongoDB unheathy:", error);
+        return "unhealthy";
+    }
 }
 
-async function checkRedis(): Promise<'healthy' | 'unhealthy'> {
-  try {
-    const client = getRedisClient();
-    if (!client) return 'unhealthy';
-    await client.ping();
-    return 'healthy';
-  } catch {
-    return 'unhealthy';
-  }
+/**
+ * Check Redis health
+ */
+async function checkRedis(): Promise<string> {
+    try {
+        const client = getRedisClient();
+        if (!client) return "unhealthy";
+        await client.ping();
+        return "healthy";
+    } catch (error) {
+        console.error("[Health] Redis unheathy:", error);
+        return "unhealthy";
+    }
 }
 
+/**
+ * Check LLM availability
+ */
+async function checkLLM(): Promise<string> {
+    try {
+        // Simple fast ping to check connectivity
+        // Using a very low token limit and simple prompt
+        await autoRoutedChatCompletion("You are a health check system.", "ping", { 
+            max_tokens: 5,
+            temperature: 0
+        });
+        return "healthy";
+    } catch (error) {
+        console.error("[Health] LLM unreachable:", error);
+        return "unhealthy";
+    }
+}
+
+/**
+ * GET /health
+ */
 export async function healthHandler(_req: Request): Promise<Response> {
-  const [mongodb, redis] = await Promise.all([checkMongo(), checkRedis()]);
+    const start = Date.now();
+    
+    // Check services in parallel
+    const [mongo, redis, llm] = await Promise.all([
+        checkMongo(),
+        checkRedis(),
+        checkLLM()
+    ]);
 
-  const checks = {
-    status: mongodb === 'healthy' ? 'ok' : 'degraded',
-    version: process.env.APP_VERSION || '1.0.0',
-    timestamp: new Date().toISOString(),
-    uptime: Math.round(process.uptime()),
-    services: { mongodb, redis },
-  };
+    const checks = {
+        status: mongo === "healthy" && redis === "healthy" && llm === "healthy" ? "ok" : "degraded",
+        version: "1.0.0",
+        timestamp: new Date().toISOString(),
+        duration_ms: Date.now() - start,
+        services: {
+            mongodb: mongo,
+            redis: redis,
+            llm: llm
+        }
+    };
 
-  const allHealthy = mongodb === 'healthy';
-  return Response.json(checks, { status: allHealthy ? 200 : 503 });
+    const allHealthy = checks.status === "ok";
+    return new Response(JSON.stringify(checks), { 
+        status: allHealthy ? 200 : 503,
+        headers: { "Content-Type": "application/json" }
+    });
 }
 
+/**
+ * GET /ready
+ */
 export async function readyHandler(_req: Request): Promise<Response> {
-  const [mongodb, redis] = await Promise.all([checkMongo(), checkRedis()]);
-  const ready = mongodb === 'healthy' && redis === 'healthy';
-  return Response.json(
-    { ready, timestamp: new Date().toISOString() },
-    { status: ready ? 200 : 503 }
-  );
+    const mongo = await checkMongo();
+    const redis = await checkRedis();
+    
+    // Readiness only depends on critical infra (Mongo & Redis)
+    const isReady = mongo === "healthy" && redis === "healthy";
+    
+    return new Response(isReady ? "READY" : "NOT_READY", {
+        status: isReady ? 200 : 503,
+        headers: { "Content-Type": "text/plain" }
+    });
 }
 
+/**
+ * GET /metrics
+ * Returns Prometheus text format metrics
+ */
 export async function metricsHandler(_req: Request): Promise<Response> {
-  // Prometheus text format
-  const uptime = Math.round(process.uptime());
-  const memUsage = process.memoryUsage();
+    const mongo = await checkMongo();
+    const redis = await checkRedis();
+    
+    // In a real system, these would come from prometheus client
+    // For now, we return basic infrastructure health as metrics
+    const metrics = [
+        '# HELP reckruit_mongodb_status MongoDB health status (1 for healthy, 0 for unhealthy)',
+        '# TYPE reckruit_mongodb_status gauge',
+        `reckruit_mongodb_status ${mongo === "healthy" ? 1 : 0}`,
+        '',
+        '# HELP reckruit_redis_status Redis health status (1 for healthy, 0 for unhealthy)',
+        '# TYPE reckruit_redis_status gauge',
+        `reckruit_redis_status ${redis === "healthy" ? 1 : 0}`,
+        '',
+        '# HELP reckruit_version_info Application version info',
+        '# TYPE reckruit_version_info gauge',
+        'reckruit_version_info{version="1.0.0"} 1'
+    ].join('\n');
 
-  const metrics = [
-    `# HELP reckruit_uptime_seconds Server uptime in seconds`,
-    `# TYPE reckruit_uptime_seconds gauge`,
-    `reckruit_uptime_seconds ${uptime}`,
-    ``,
-    `# HELP reckruit_memory_heap_used_bytes Heap memory used`,
-    `# TYPE reckruit_memory_heap_used_bytes gauge`,
-    `reckruit_memory_heap_used_bytes ${memUsage.heapUsed}`,
-    ``,
-    `# HELP reckruit_memory_heap_total_bytes Heap memory total`,
-    `# TYPE reckruit_memory_heap_total_bytes gauge`,
-    `reckruit_memory_heap_total_bytes ${memUsage.heapTotal}`,
-  ].join('\n');
-
-  return new Response(metrics, {
-    status: 200,
-    headers: { 'Content-Type': 'text/plain; version=0.0.4' },
-  });
+    return new Response(metrics, {
+        status: 200,
+        headers: { "Content-Type": "text/plain; version=0.0.4; charset=utf-8" }
+    });
 }

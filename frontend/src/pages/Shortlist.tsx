@@ -31,8 +31,7 @@ import {
     Brain,
     Trash2,
     Activity,
-    Database,
-    Calendar
+    Database
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
@@ -51,9 +50,7 @@ export default function Shortlist() {
         toggleCopilot,
         copilot,
         batchId,
-        setBatchId,
-        addInterview,
-        setView
+        setBatchId
     } = useApp();
 
     const [removeModalId, setRemoveModalId] = useState<string | null>(null);

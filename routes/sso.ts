@@ -1,5 +1,6 @@
 import { generateToken } from "../utils/auth";
 import { getMongoDb } from "../utils/mongoClient";
+import { SsoService } from "../services/ssoService";
 
 /**
  * SSO INITIATION HANDLER
@@ -17,13 +18,22 @@ export async function ssoInitHandler(req: Request): Promise<Response> {
     }
 
     // Enterprise Logic: Lookup tenant settings for SSO provider
-    // For this demonstration, we'll simulate a redirect to a mock SSO page
-    const mockSsoUrl = `https://sso.mock-enterprise.com/login?tenant=${tenantId}&callback=${encodeURIComponent('http://localhost:3000/sso-callback')}`;
+    const config = await SsoService.getTenantConfig(tenantId);
+    
+    if (!config) {
+        // Fallback or Inform that SSO is not configured for this tenant
+        return new Response(JSON.stringify({
+            success: false,
+            error: "SSO is not configured for this organization. Please contact your administrator."
+        }), { status: 404 });
+    }
+
+    const redirectUrl = `${config.entryPoint}?tenant=${tenantId}&callback=${encodeURIComponent('https://api.reckruit.ai/v1/auth/sso/callback')}`;
 
     return new Response(JSON.stringify({
         success: true,
-        redirectUrl: mockSsoUrl,
-        message: "SSO redirection metadata prepared"
+        redirectUrl,
+        message: `Redirecting to ${config.provider}...`
     }), { status: 200 });
 }
 
@@ -33,45 +43,31 @@ export async function ssoInitHandler(req: Request): Promise<Response> {
  */
 export async function ssoCallbackHandler(req: Request): Promise<Response> {
     try {
-        const body = await req.json();
-        // In reality, you'd verify a SAML assertion or OIDC ID Token here.
-        const { ssoToken, tenantId } = body;
+        let ssoToken: string | null = null;
+        let tenantId: string | null = null;
+
+        const contentType = req.headers.get("content-type") || "";
+        
+        if (contentType.includes("application/json")) {
+            const body = await req.json();
+            ssoToken = body.ssoToken || body.SAMLResponse;
+            tenantId = body.tenantId;
+        } else {
+            const formData = await req.formData();
+            ssoToken = (formData.get("ssoToken") || formData.get("SAMLResponse")) as string;
+            tenantId = formData.get("tenantId") as string;
+        }
 
         if (!ssoToken || !tenantId) {
-            return new Response(JSON.stringify({
-                success: false,
-                error: "Invalid SSO callback payload"
-            }), { status: 400 });
+            return new Response(JSON.stringify({ success: false, error: "Missing ssoToken or tenantId" }), { status: 400 });
         }
 
-        // Mock verification logic: if token is "valid_enterprise_user", we log them in.
-        if (ssoToken !== 'valid_enterprise_user') {
-            return new Response(JSON.stringify({
-                success: false,
-                error: "SSO authentication failed"
-            }), { status: 401 });
-        }
+        // 1. Verify Assertion
+        const userData = await SsoService.verifyAssertion(tenantId, ssoToken);
 
-        const db = getMongoDb();
-        if (!db) return new Response(JSON.stringify({ error: "DB Unavailable" }), { status: 503 });
-
-        // Auto-provision or find user
-        const email = "enterprise-user@company.com";
-        const usersDb = db.collection('users');
-        let user = await usersDb.findOne({ email, tenantId });
-
-        if (!user) {
-            const newUser = {
-                email,
-                tenantId,
-                name: "Enterprise User",
-                roles: ["recruiter"], // Default role for SSO users
-                ssoFederated: true,
-                createdAt: new Date().toISOString()
-            };
-            const result = await usersDb.insertOne(newUser);
-            user = { _id: result.insertedId, ...newUser };
-        }
+        // 2. Provision User
+        const user = await SsoService.provisionUser(tenantId, userData);
+        if (!user) throw new Error("Failed to provision user");
 
         const token = generateToken({
             userId: user._id.toString(),
@@ -80,13 +76,15 @@ export async function ssoCallbackHandler(req: Request): Promise<Response> {
             roles: user.roles || ["recruiter"]
         });
 
-        return new Response(JSON.stringify({
-            success: true,
-            token,
-            user: { email: user.email, tenantId: user.tenantId, roles: user.roles, id: user._id }
-        }), { status: 200 });
+        // 🟢 Enterprise Redirect 🟢
+        // Redirect back to the frontend dashboard with the token
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const redirectUrl = `${frontendUrl}/auth/callback?token=${token}`;
 
-    } catch (error) {
-        return new Response(JSON.stringify({ success: false, error: "SSO processing failed" }), { status: 500 });
+        return Response.redirect(redirectUrl, 302);
+
+    } catch (error: any) {
+        console.error('[SSO Callback] Authentication failed:', error.message);
+        return new Response(JSON.stringify({ success: false, error: "SSO authentication failed" }), { status: 401 });
     }
 }

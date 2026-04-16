@@ -7,6 +7,7 @@ import { extractResumeData } from "../services/resumeExtractor";
 import { extractJobDescriptionData } from "../services/jdExtractor";
 import { parsePDF } from "../utils/pdfParser";
 import { downloadFileFromUrl } from "../utils/fileDownloader";
+import { AuthContext } from "../middleware/authMiddleware";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -77,14 +78,10 @@ export async function recruiterAssessHandler(req: Request, context: AuthContext)
                 const jdBuffer = Buffer.from(await jdFile.arrayBuffer());
                 const resumeBuffer = Buffer.from(await resumeFile.arrayBuffer());
 
-                const [jdText, resumeText] = await Promise.all([
-                    parsePDF(jdBuffer),
-                    parsePDF(resumeBuffer),
-                ]);
-
+                // Extract data from files
                 const [jdData, resumeData] = await Promise.all([
                     extractJobDescriptionData(jdBuffer),
-                    extractResumeData(resumeBuffer),
+                    extractResumeData(resumeBuffer, tenantId),
                 ]);
 
                 assessmentInput = convertLegacyToRecruiterInput(jdData, resumeData);
@@ -147,7 +144,7 @@ export async function recruiterAssessHandler(req: Request, context: AuthContext)
             console.log("[RecruiterAssess] Extracting data from PDFs");
             const [jdData, resumeData] = await Promise.all([
                 extractJobDescriptionData(jdBuffer),
-                extractResumeData(resumeBuffer),
+                extractResumeData(resumeBuffer, tenantId),
             ]);
 
             // Convert to new format

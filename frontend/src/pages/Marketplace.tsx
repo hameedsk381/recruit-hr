@@ -4,10 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { 
-    LayoutGrid, Search, Globe, Shield, Phone, MessageSquare, 
-    Calendar, Briefcase, Zap, ExternalLink, Check, Plus,
-    Filter, ArrowRight, Star, Key, Copy, Trash2, RefreshCw,
-    Terminal, Code, Book, Rocket
+    LayoutGrid, Search, Zap, ExternalLink, Plus,
+    ArrowRight, Star, Key, Copy, Trash2, RefreshCw,
+    Code, Book, Rocket
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import api from '../api/client';

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { TalentPoolService } from '../../services/talentPoolService';
 import { AuthContext } from '../../middleware/authMiddleware';
+import { PiiService } from '../../services/piiService';
 
 const AddProfileSchema = z.object({
   source: z.enum(['applied', 'sourced', 'referred', 'imported', 'rehire']),
@@ -45,6 +46,12 @@ export async function searchTalentPoolHandler(req: Request, context: AuthContext
     limit: Number(url.searchParams.get('limit') || 20),
     offset: Number(url.searchParams.get('offset') || 0),
   });
+
+  // Phase 5: PII Data Masking
+  if (result.profiles) {
+    result.profiles = result.profiles.map((p: any) => PiiService.scrubCandidate(p, context.roles));
+  }
+
   return Response.json({ success: true, ...result });
 }
 
@@ -72,7 +79,11 @@ export async function addToTalentPoolHandler(req: Request, context: AuthContext)
 export async function getTalentProfileHandler(req: Request, context: AuthContext, id: string): Promise<Response> {
   const profile = await TalentPoolService.getById(context.tenantId, id);
   if (!profile) return err('NOT_FOUND', 'Profile not found', 404);
-  return Response.json({ success: true, profile });
+
+  // Phase 5: PII Data Masking
+  const scrubbedProfile = PiiService.scrubCandidate(profile, context.roles);
+
+  return Response.json({ success: true, profile: scrubbedProfile });
 }
 
 export async function updateTalentProfileHandler(req: Request, context: AuthContext, id: string): Promise<Response> {
@@ -124,4 +135,13 @@ export async function bulkImportHandler(req: Request, context: AuthContext): Pro
 
   const result = await TalentPoolService.bulkImport(context.tenantId, profiles, context.userId);
   return Response.json({ success: true, ...result });
+}
+export async function semanticSearchHandler(req: Request, context: AuthContext): Promise<Response> {
+  let body: any;
+  try { body = await req.json(); } catch { return err('INVALID_JSON', 'Invalid JSON body', 400); }
+
+  if (!body.query) return err('VALIDATION_ERROR', 'Missing query', 400);
+
+  const profiles = await TalentPoolService.semanticSearch(context.tenantId, body.query, body.limit);
+  return Response.json({ success: true, profiles });
 }

@@ -177,6 +177,43 @@ Return a JSON response with this structure:
 BE STRICT: Only flag as relevantMatch=true if the candidate genuinely fits the role and has meaningful skill overlap. Pay special attention to experience thresholds - if a job requires X years and the candidate has less than X years, this should significantly impact the score. For domain-specific skills, only count experience if it's in the relevant domain.
 
 {{input_data}}`
+    },
+    'OFFER_ACCEPTANCE_PREDICTION_V1': {
+        id: 'offer-acceptance-prediction',
+        version: '1.0.0',
+        description: 'Predicts the probability of a candidate accepting an offer based on profile and offer details',
+        modelConfig: {
+            recommendedModel: 'llama-3-70b-8192',
+            temperature: 0.2,
+            maxTokens: 1024
+        },
+        template: `You are an expert recruitment analyst specializing in offer acceptance prediction.
+Analyze the candidate profile, the offer details, and the provided market context to predict the probability of acceptance.
+
+CONSIDER THE FOLLOWING FACTORS:
+1. Career Trajectory: Is this a step up, lateral, or step down for the candidate?
+2. Compensation Alignment: How does the offer compare to market benchmarks and the candidate's experience?
+3. Time in Process: How long has the candidate been in the pipeline? (Longer = potentially colder)
+4. Interview Sentiment: Based on interview scorecards, how enthusiastic was the candidate?
+5. External Supply/Demand: Is the candidate's skill set in high demand?
+
+Return ONLY a JSON object in this format:
+{
+  "probability": <number between 0-1>,
+  "confidence": "high" | "medium" | "low",
+  "drivers": [
+    {
+      "factor": "Factor name",
+      "impact": "positive" | "negative",
+      "reasoning": "Brief explanation"
+    }
+  ],
+  "recommendations": ["Actionable steps to increase acceptance likelihood"],
+  "analysis": "A brief summary of the reasoning"
+}
+
+DATA FOR ANALYSIS:
+{{input_data}}`
     }
 };
 

@@ -3,6 +3,7 @@ import { parsePDF } from "../utils/pdfParser";
 import { getLLMCache, setLLMCache } from "../utils/llmCache";
 import { getPrompt } from "./promptRegistry";
 import { createHash } from "crypto";
+import { getMongoDb } from "../utils/mongoClient";
 
 // Interface for resume data
 export interface ResumeData {
@@ -473,7 +474,7 @@ function getMonthIndex(monthStr: string): number {
   return idx >= 0 ? idx : 0;
 }
 
-export async function extractResumeData(buffer: Buffer): Promise<ResumeData> {
+export async function extractRawResumeData(buffer: Buffer): Promise<ResumeData> {
   try {
     // Create a cache key based on the buffer content
     const cacheKey = `resume_extract_${createHash('md5')
@@ -659,4 +660,25 @@ export async function extractResumeData(buffer: Buffer): Promise<ResumeData> {
     console.error('[ResumeExtractor] Error:', error);
     throw new Error(`Failed to extract resume data: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
+}
+
+export async function extractResumeData(buffer: Buffer, tenantId?: string): Promise<ResumeData> {
+  const rawData = await extractRawResumeData(buffer);
+  
+  if (!tenantId) return rawData;
+  
+  try {
+    const db = getMongoDb();
+    if (!db) return rawData;
+    
+    const tenantObj = await db.collection('tenants').findOne({ tenantId });
+    if (tenantObj && tenantObj.blindScreening && tenantObj.blindScreening.enabled) {
+        console.log(`[ResumeExtractor] Applying blind screening for tenant ${tenantId}`);
+        return applyBlindMode(rawData, tenantObj.blindScreening);
+    }
+  } catch (error) {
+    console.error('[ResumeExtractor] Failed to apply blind screening:', error);
+  }
+  
+  return rawData;
 }

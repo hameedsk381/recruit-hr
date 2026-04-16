@@ -25,6 +25,7 @@ export interface TalentProfile {
     location?: string;
   };
   tags: string[];
+  vector?: number[];
   notes: RecruiterNote[];
   pipeline: {
     currentStage: string;
@@ -50,8 +51,18 @@ export class TalentPoolService {
   static async add(tenantId: string, data: Omit<TalentProfile, '_id' | 'tenantId' | 'createdAt' | 'updatedAt'>, userId: string): Promise<TalentProfile> {
     const db = getMongoDb();
     const now = new Date();
-    const doc: TalentProfile = { ...data, tenantId, createdAt: now, updatedAt: now };
 
+    // Phase 2: Generate embeddings for semantic search
+    let vector: number[] | undefined;
+    try {
+      const { EmbeddingService } = await import('./embeddingService');
+      const textToEmbed = `${data.candidate.name} ${data.candidate.currentRole} ${data.candidate.skills?.join(' ')}`;
+      vector = await EmbeddingService.getEmbedding(textToEmbed);
+    } catch (e) {
+      console.error('[TalentPool] Embedding failed:', e);
+    }
+
+    const doc: TalentProfile = { ...data, tenantId, vector, createdAt: now, updatedAt: now };
     const result = await db.collection(COLLECTION).insertOne(doc);
 
     await AuditService.getInstance().log({
@@ -194,5 +205,36 @@ export class TalentPoolService {
     });
 
     return { inserted, skipped };
+  }
+
+  static async semanticSearch(tenantId: string, query: string, limit = 10): Promise<TalentProfile[]> {
+    const { EmbeddingService } = await import('./embeddingService');
+    const queryVector = await EmbeddingService.getEmbedding(query);
+
+    // In a real Phase 2 implementation, this would hit Qdrant.
+    // For now, we use MongoDB's aggregation if the collection has a vector index,
+    // or we fall back to a weighted search.
+    const db = getMongoDb();
+    
+    // Attempting MongoDB Vector Search (requires 'vector_index' to be configured in Atlas)
+    try {
+      const results = await db.collection(COLLECTION).aggregate([
+        {
+          "$vectorSearch": {
+            "index": "vector_index",
+            "path": "vector",
+            "queryVector": queryVector,
+            "numCandidates": 100,
+            "limit": limit,
+            "filter": { "tenantId": tenantId }
+          }
+        }
+      ]).toArray();
+      return results as TalentProfile[];
+    } catch (e) {
+      console.warn('[TalentPool] MongoDB Vector Search failed, falling back to keyword search:', e);
+      const searchResult = await this.search(tenantId, { text: query, limit });
+      return searchResult.profiles;
+    }
   }
 }
