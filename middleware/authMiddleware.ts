@@ -2,6 +2,8 @@ import { hasRole, hasPermission, Role } from '../utils/permissions';
 import { initializeRequestContext } from '../utils/requestContext';
 import { AuditService } from '../services/auditService';
 import { verifyToken } from '../utils/auth';
+import { APIKeyService } from '../services/apiKeyService';
+import { AgencyService } from '../services/agencyService';
 
 export interface AuthContext {
     isAuthenticated: boolean;
@@ -24,16 +26,40 @@ export async function validateRequestAuth(req: Request): Promise<{
     context?: AuthContext;
     response?: Response;
 }> {
-    // 1. Get Token from Authorization Header
     const authHeader = req.headers.get('Authorization');
+    const xApiKey = req.headers.get('X-API-Key');
 
+    // Case 1: API Key Auth
+    if (xApiKey) {
+        const keyResult = await APIKeyService.validateKey(xApiKey);
+        if (keyResult.valid) {
+            const authContext: AuthContext = {
+                isAuthenticated: true,
+                tenantId: keyResult.tenantId!,
+                userId: 'api_key_system',
+                email: `api_${keyResult.tenantId}@reckruit.ai`,
+                roles: keyResult.scopes || ['all']
+            };
+            return { valid: true, context: authContext };
+        } else {
+            return {
+                valid: false,
+                response: new Response(
+                    JSON.stringify({ success: false, error: "Invalid or expired API Key." }),
+                    { status: 401, headers: { 'Content-Type': 'application/json' } }
+                )
+            };
+        }
+    }
+
+    // Case 2: JWT Auth (Bearer Token)
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return {
             valid: false,
             response: new Response(
                 JSON.stringify({
                     success: false,
-                    error: "Authentication required. Please provide a Bearer token."
+                    error: "Authentication required. Please provide a Bearer token or X-API-Key."
                 }),
                 { status: 401, headers: { 'Content-Type': 'application/json' } }
             )
@@ -46,9 +72,28 @@ export async function validateRequestAuth(req: Request): Promise<{
         // 2. Verify JWT
         const decoded = verifyToken(token);
 
+        // 3. Handle Agency / RPO Mode (Cross-tenant access)
+        const requestedTenantId = req.headers.get('x-tenant-id');
+        let effectiveTenantId = decoded.tenantId;
+
+        if (requestedTenantId && requestedTenantId !== decoded.tenantId) {
+            const isAuthorized = await AgencyService.isAgencyUserManagingClient(decoded.tenantId, requestedTenantId);
+            if (isAuthorized) {
+                effectiveTenantId = requestedTenantId;
+            } else {
+                return {
+                    valid: false,
+                    response: new Response(
+                        JSON.stringify({ success: false, error: "Access to the requested tenant is denied." }),
+                        { status: 403, headers: { 'Content-Type': 'application/json' } }
+                    )
+                };
+            }
+        }
+
         const authContext: AuthContext = {
             isAuthenticated: true,
-            tenantId: decoded.tenantId,
+            tenantId: effectiveTenantId,
             userId: decoded.userId,
             email: decoded.email,
             roles: decoded.roles || ['user']

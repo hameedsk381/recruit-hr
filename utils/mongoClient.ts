@@ -40,6 +40,13 @@ export function getMongoDb(): Db {
 }
 
 /**
+ * Get a specific collection by name
+ */
+export function getCollection(name: string) {
+  return getMongoDb().collection(name);
+}
+
+/**
  * Get MongoDB client instance
  */
 export function getMongoClient(): MongoClient {

@@ -1,4 +1,5 @@
 import { unifiedLiteLlmChat } from '../utils/liteLlmClient';
+import { groqChatCompletion } from '../utils/groqClient';
 import { PIIManager } from '../utils/pii';
 
 export interface RouteOptions {
@@ -37,6 +38,12 @@ export async function hybridChatCompletion(
 
   console.log(`[LLMRouter] Analyzing payload. Contains PII: ${containsPII}`);
 
+  // User requested to only use Groq (bypass LiteLLM and Sovereignty)
+  if (process.env.USE_DIRECT_GROQ === 'true') {
+    console.log('[LLMRouter] USE_DIRECT_GROQ is active. Routing directly to Groq.');
+    return await groqChatCompletion(systemPrompt, userPrompt, temperature, max_tokens);
+  }
+
   // Construct requested model literal for LiteLLM (e.g., 'openai/gpt-4o' or 'ollama/mistral')
   let resolvedModel = (targetProvider && targetModel) 
     ? `${targetProvider}/${targetModel}` 
@@ -63,7 +70,18 @@ export async function hybridChatCompletion(
 
     return await unifiedLiteLlmChat(resolvedModel, systemPrompt, userPrompt, temperature, max_tokens);
   } catch (error) {
-    console.error(`[LLMRouter] Error with hybrid route. Error: ${error}`);
+    console.error(`[LLMRouter] LiteLLM Proxy Failed. Attempting direct fallback... Error: ${error}`);
+    
+    // Fallback logic: If proxy fails and it's a groq model or default, try direct Groq
+    if (resolvedModel?.includes('groq') || resolvedModel === 'groq-fast') {
+      try {
+        console.log('[LLMRouter] Triggering direct Groq fallback...');
+        return await groqChatCompletion(systemPrompt, userPrompt, temperature, max_tokens);
+      } catch (fallbackError) {
+        console.error('[LLMRouter] Direct fallback failed:', fallbackError);
+      }
+    }
+    
     throw new Error(`Hybrid Routing Failed: ${error instanceof Error ? error.message : 'Unknown'}`);
   }
 }

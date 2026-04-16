@@ -19,6 +19,7 @@ import Referrals from '../pages/Referrals';
 import Predictions from '../pages/Predictions';
 import Knowledge from '../pages/Knowledge';
 import Fairness from '../pages/Fairness';
+import Marketplace from '../pages/Marketplace';
 import { Search, Bell, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -60,6 +61,7 @@ export default function DashboardLayout() {
             case 'predictions': return <Predictions />;
             case 'knowledge': return <Knowledge />;
             case 'fairness': return <Fairness />;
+            case 'marketplace': return <Marketplace />;
             default: return <Dashboard />;
         }
     };

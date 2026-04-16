@@ -106,6 +106,8 @@ import {
 // Load environment variables
 config();
 
+import { listAPIKeysHandler, createAPIKeyHandler, revokeAPIKeyHandler } from "./routes/apiKeys";
+
 const PORT = Number(process.env.HR_TOOLS_PORT) || 3001;
 
 const corsHeaders = {
@@ -721,6 +723,18 @@ async function startServer() {
           }
           if (req.method === "GET" && url.pathname === "/v1/predictions/weights") {
             const r = await getAIWeightsHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          }
+
+          // ─── Phase 5 v1 Routes ───────────────────────────────────────────
+          if (req.method === "GET" && url.pathname === "/v1/auth/api-keys") {
+            const r = await listAPIKeysHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          }
+          if (req.method === "POST" && url.pathname === "/v1/auth/api-keys") {
+            const r = await createAPIKeyHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          }
+          const apiKeyMatch = url.pathname.match(/^\/v1\/auth\/api-keys\/([^/]+)$/);
+          if (apiKeyMatch && req.method === "DELETE") {
+            const r = await revokeAPIKeyHandler(req, context, apiKeyMatch[1]); logRequest(req, startTime, r.status); return addCors(r);
           }
 
           // ─────────────────────────────────────────────────────────────────

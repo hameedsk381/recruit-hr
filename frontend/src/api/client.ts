@@ -450,6 +450,16 @@ export const api = {
 
     getVideoSession: (id: string) =>
         request<{ success: boolean; session: any }>(`/v1/video-sessions/${id}`),
+
+    // ── Phase 5: API Keys ────────────────────────────────────────────────
+    listAPIKeys: () =>
+        request<{ success: boolean; keys: any[] }>('/v1/auth/api-keys'),
+
+    createAPIKey: (name: string, scopes: string[] = ['all']) =>
+        request<{ success: boolean; id: string; key: string }>('/v1/auth/api-keys', { method: 'POST', body: { name, scopes } }),
+
+    revokeAPIKey: (id: string) =>
+        request<{ success: boolean }>(`/v1/auth/api-keys/${id}`, { method: 'DELETE' }),
 };
 
 export default api;

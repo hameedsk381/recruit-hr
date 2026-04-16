@@ -3,7 +3,7 @@ import { useTheme } from '../context/ThemeContext';
 import {
     ClipboardList, Users, LayoutDashboard, Calendar, Columns, Settings,
     LogOut, Clock, Sparkles, Briefcase, UserSearch, GitMerge, TrendingUp,
-    BookOpen, ShieldCheck, FileText, Moon, Sun, Monitor
+    BookOpen, ShieldCheck, FileText, Moon, Sun, Monitor, LayoutGrid
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -28,9 +28,10 @@ export default function Sidebar() {
         { id: 'knowledge', label: 'Hiring Docs', icon: BookOpen, category: 'Intelligence', hidden: isHM },
         { id: 'fairness', label: 'Bias Audit', icon: ShieldCheck, category: 'Intelligence', hidden: isHM },
         { id: 'offers', label: 'Offers', icon: Briefcase, category: 'Hiring', hidden: isHM },
+        { id: 'marketplace', label: 'Marketplace', icon: LayoutGrid, category: 'Ecosystem', hidden: isHM },
     ];
 
-    const visibleCategories = isHM ? ['Main'] : ['Main', 'Pipeline', 'Hiring', 'Intelligence'];
+    const visibleCategories = isHM ? ['Main'] : ['Main', 'Pipeline', 'Hiring', 'Intelligence', 'Ecosystem'];
 
     return (
         <aside className={cn(
