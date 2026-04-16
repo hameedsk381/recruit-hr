@@ -233,8 +233,6 @@ async function startServer() {
 
         // 🟢 Centralized Response Wrapper 🟢
         const requestOrigin = req.headers.get("origin");
-        const allowedOrigin = await resolveAllowedOrigin(requestOrigin, context?.tenantId);
-        const addCors = (res: Response) => applyCorsHeaders(res, allowedOrigin);
 
         const addVersionHeaders = (res: Response) => {
           const newHeaders = new Headers(res.headers);
@@ -246,8 +244,11 @@ async function startServer() {
           return new Response(res.body, { status: res.status, statusText: res.statusText, headers: newHeaders });
         };
 
+        // finalHandler resolves CORS at call time so it has access to context.tenantId
+        // (context is a let declared below; closures capture the binding, not the value)
         const finalHandler = async (res: Response) => {
-          const finishedRes = addSecurityHeaders(addVersionHeaders(addCors(res)));
+          const resolvedOrigin = await resolveAllowedOrigin(requestOrigin, context?.tenantId);
+          const finishedRes = addSecurityHeaders(addVersionHeaders(applyCorsHeaders(res, resolvedOrigin)));
           if (context) {
             // Background audit logging
             auditMiddleware(req, context, finishedRes.status).catch(e => console.error('[Audit] Logging error:', e));
