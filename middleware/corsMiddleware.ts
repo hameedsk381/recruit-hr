@@ -10,11 +10,24 @@ const ALLOWED_HEADERS = "Content-Type, Authorization, x-tenant-id, X-API-Version
  * Pass tenantId when available (authenticated requests) to also enforce
  * that the origin belongs to that specific tenant.
  */
+/** localhost and 127.0.0.1 on any port are always allowed (local development). */
+function isLocalOrigin(origin: string): boolean {
+  try {
+    const { hostname } = new URL(origin);
+    return hostname === "localhost" || hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
+}
+
 export async function resolveAllowedOrigin(
   origin: string | null,
   tenantId?: string
 ): Promise<string | null> {
   if (!origin) return null;
+
+  // Always allow localhost — no production risk, avoids dev friction
+  if (isLocalOrigin(origin)) return origin;
 
   const globalSet = await getAllowedOriginsSet();
   if (!globalSet.has(origin)) return null;
