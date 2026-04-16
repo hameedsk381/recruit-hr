@@ -3,6 +3,7 @@ import { AuthContext } from "../middleware/authMiddleware";
 import { ROLES } from "../utils/permissions";
 import { AuditService } from "../services/auditService";
 import { z } from "zod";
+import { invalidateOriginsCache } from "../utils/tenantSettingsCache";
 
 /**
  * Fetch tenant-specific settings (Webhooks, Notifications)
@@ -43,23 +44,27 @@ export async function updateTenantSettingsHandler(req: Request, context: AuthCon
         }
 
         const body = await req.json();
-        const { slackWebhookUrl, teamsWebhookUrl, notificationsEnabled } = body;
+        const { slackWebhookUrl, teamsWebhookUrl, notificationsEnabled, allowedOrigins } = body;
 
         const db = getMongoDb();
         if (!db) return new Response(JSON.stringify({ error: "DB Unavailable" }), { status: 503 });
 
         await db.collection('tenants').updateOne(
             { tenantId: context.tenantId },
-            { 
-                $set: { 
-                    slackWebhookUrl, 
-                    teamsWebhookUrl, 
+            {
+                $set: {
+                    slackWebhookUrl,
+                    teamsWebhookUrl,
                     notificationsEnabled,
+                    ...(Array.isArray(allowedOrigins) ? { allowedOrigins } : {}),
                     updatedAt: new Date()
-                } 
+                }
             },
             { upsert: true }
         );
+
+        // Invalidate global CORS origins cache so new origins take effect immediately
+        await invalidateOriginsCache();
 
         return new Response(JSON.stringify({ success: true, message: "Tenant settings updated" }), { status: 200 });
     } catch (error) {
