@@ -85,14 +85,14 @@ export default function JobApplicationFlow() {
                 
                 {/* Header */}
                 <header className="flex items-center justify-between mb-8 shrink-0">
-                    <Button variant="ghost" onClick={() => navigate(-1)} className="text-zinc-400 hover:text-white -ml-4">
+                    <Button variant="ghost" onClick={() => navigate(-1)} className="text-muted-foreground hover:text-white -ml-4">
                         <ArrowLeft size={20} className="mr-2" /> Back to Jobs
                     </Button>
                     <div className="flex items-center gap-2">
                         <div className="size-8 rounded-lg bg-indigo-600 flex items-center justify-center">
                             <Sparkles size={18} />
                         </div>
-                        <span className="font-bold">reckuit.ai</span>
+                        <span className="font-bold">reckruit.ai</span>
                     </div>
                 </header>
 
@@ -103,13 +103,13 @@ export default function JobApplicationFlow() {
                         <div className="w-full max-w-md space-y-8 py-12 animate-in fade-in slide-in-from-bottom-4">
                             <div className="text-center space-y-2">
                                 <h1 className="text-3xl font-bold">Apply for this role</h1>
-                                <p className="text-zinc-400">Fill in your details and upload your resume to start.</p>
+                                <p className="text-muted-foreground">Fill in your details and upload your resume to start.</p>
                             </div>
 
                             <form onSubmit={handleApply} className="space-y-6">
                                 <div className="space-y-4">
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium text-zinc-400">Full Name</label>
+                                        <label className="text-sm font-medium text-muted-foreground">Full Name</label>
                                         <input 
                                             required
                                             className="w-full h-12 bg-zinc-900 border border-white/10 rounded-xl px-4 focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -118,7 +118,7 @@ export default function JobApplicationFlow() {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium text-zinc-400">Email Address</label>
+                                        <label className="text-sm font-medium text-muted-foreground">Email Address</label>
                                         <input 
                                             required
                                             type="email"
@@ -128,7 +128,7 @@ export default function JobApplicationFlow() {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium text-zinc-400">Resume (PDF/DOCX)</label>
+                                        <label className="text-sm font-medium text-muted-foreground">Resume (PDF/DOCX)</label>
                                         <div className="relative group">
                                             <input 
                                                 type="file" 
@@ -144,8 +144,8 @@ export default function JobApplicationFlow() {
                                                     </div>
                                                 ) : (
                                                     <>
-                                                        <Upload className="text-zinc-500 group-hover:text-indigo-400" size={32} />
-                                                        <span className="text-zinc-500 text-sm font-medium">Click or drag to upload</span>
+                                                        <Upload className="text-muted-foreground group-hover:text-indigo-400" size={32} />
+                                                        <span className="text-muted-foreground text-sm font-medium">Click or drag to upload</span>
                                                     </>
                                                 )}
                                             </div>
@@ -174,7 +174,7 @@ export default function JobApplicationFlow() {
                                     </div>
                                     <div>
                                         <p className="font-bold text-sm">Technical Evaluator</p>
-                                        <p className="text-[10px] text-zinc-500 font-bold tracking-widest uppercase">AI Agent • Phase 1</p>
+                                        <p className="text-[10px] text-muted-foreground font-bold tracking-widest uppercase">AI Agent • Phase 1</p>
                                     </div>
                                 </div>
                             </div>
@@ -230,14 +230,14 @@ export default function JobApplicationFlow() {
                             </div>
                             <div className="space-y-4">
                                 <h1 className="text-4xl font-bold">Application Sent!</h1>
-                                <p className="text-zinc-400 font-medium">
+                                <p className="text-muted-foreground font-medium">
                                     Great job with the screening interview. We've sent a **Magic Link** to your email so you can track your status in real-time.
                                 </p>
                             </div>
                             <div className="pt-4">
                                 <Button 
                                     onClick={() => navigate(`/status/${chatToken}`)}
-                                    className="w-full h-14 bg-zinc-900 hover:bg-zinc-800 border border-white/10 rounded-2xl font-bold"
+                                    className="w-full h-14 bg-zinc-900 hover:bg-primary/90 border border-white/10 rounded-2xl font-bold"
                                 >
                                     Check Status Now
                                 </Button>

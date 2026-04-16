@@ -1,11 +1,9 @@
 import { useState, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import api from '../api/client';
-import type { JobDescription, WeightedSkill } from '../types';
+import type { JobDescription } from '../types';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -19,12 +17,9 @@ import {
     Upload,
     Check,
     Trash2,
-    Plus,
     ArrowRight,
-    Briefcase,
     Target,
     Zap,
-    AlertCircle,
     FileText,
     Database,
     ChevronRight,
@@ -113,11 +108,20 @@ export default function JobSetup() {
         }
     };
 
+    const handleStartOver = () => {
+        setJob(null);
+        setStep('upload-jd');
+        setCandidateFiles([]);
+        setBatchId(null);
+        setCandidates([]);
+    };
+
     return (
         <div className="max-w-5xl mx-auto space-y-10 pb-24 px-4 sm:px-6 lg:px-8 animate-in fade-in duration-500">
             {/* Wizard Progress Header */}
             <div className="flex items-center justify-between border-b border-border/50 pb-6 pt-4">
-                {(['upload-jd', 'verify-profile', 'bulk-resumes', 'review-launch'] as SetupStep[]).map((s, i) => {
+                <div className="flex-1 flex items-center">
+                    {(['upload-jd', 'verify-profile', 'bulk-resumes', 'review-launch'] as SetupStep[]).map((s, i) => {
                     const isCompleted = i < ['upload-jd', 'verify-profile', 'bulk-resumes', 'review-launch'].indexOf(step);
                     const isCurrent = step === s;
                     
@@ -142,6 +146,13 @@ export default function JobSetup() {
                         </div>
                     );
                 })}
+                </div>
+                {(job || candidateFiles.length > 0) && (
+                    <Button variant="ghost" size="sm" onClick={handleStartOver} className="text-xs font-medium text-muted-foreground hover:text-foreground">
+                        <ShieldCheck size={14} className="mr-1.5" />
+                        Start Over
+                    </Button>
+                )}
             </div>
 
             <AnimatePresence mode="wait">
@@ -251,11 +262,11 @@ export default function JobSetup() {
                                 </div>
                             </div>
                             <div className="space-y-6">
-                                <div className="vercel-card bg-zinc-950 text-zinc-100 border-none relative overflow-hidden">
+                                <div className="vercel-card bg-primary text-zinc-100 border-none relative overflow-hidden">
                                     <div className="absolute top-0 right-0 p-4 opacity-10">
                                         <Target className="size-24" />
                                     </div>
-                                    <h3 className="text-xs font-semibold text-zinc-400 mb-5 flex items-center gap-2 relative z-10">
+                                    <h3 className="text-xs font-semibold text-muted-foreground mb-5 flex items-center gap-2 relative z-10">
                                         <Target className="size-3.5" /> Industrial Intelligence
                                     </h3>
                                     <div className="space-y-6 relative z-10">
@@ -268,8 +279,8 @@ export default function JobSetup() {
                                             </div>
                                         </div>
                                         <div className="p-3 bg-zinc-900 rounded-lg border border-zinc-800 space-y-1.5">
-                                            <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider flex items-center gap-1.5"><Zap size={10} className="text-amber-500" /> AI Insights</p>
-                                            <p className="text-xs text-zinc-400 leading-relaxed">Detected senior-level autonomy requirements. Pricing benchmarked at Tier-1 INR compensation.</p>
+                                            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5"><Zap size={10} className="text-amber-500" /> AI Insights</p>
+                                            <p className="text-xs text-muted-foreground leading-relaxed">Detected senior-level autonomy requirements. Pricing benchmarked at Tier-1 INR compensation.</p>
                                         </div>
                                     </div>
                                 </div>

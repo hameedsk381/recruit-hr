@@ -42,7 +42,7 @@ export default function PublicCareerPortal() {
                         <div className="size-8 rounded-lg bg-indigo-600 flex items-center justify-center">
                             <Sparkles size={18} className="text-white" />
                         </div>
-                        <span className="font-bold text-lg tracking-tight">reckuit.ai</span>
+                        <span className="font-bold text-lg tracking-tight">reckruit.ai</span>
                     </div>
                 </div>
             </nav>
@@ -53,14 +53,14 @@ export default function PublicCareerPortal() {
                     <h1 className="text-4xl sm:text-6xl font-bold tracking-tight bg-gradient-to-b from-white to-white/60 bg-clip-text text-transparent">
                         Join our mission.
                     </h1>
-                    <p className="text-zinc-400 text-lg max-w-2xl mx-auto font-medium">
+                    <p className="text-muted-foreground text-lg max-w-2xl mx-auto font-medium">
                         Explore open opportunities and help us build the next generation of recruitment technology.
                     </p>
                 </div>
 
                 {/* Search / Filter */}
                 <div className="relative max-w-xl mx-auto mb-16 group">
-                    <div className="absolute inset-y-0 left-4 flex items-center text-zinc-500 group-focus-within:text-indigo-400 transition-colors">
+                    <div className="absolute inset-y-0 left-4 flex items-center text-muted-foreground group-focus-within:text-indigo-400 transition-colors">
                         <Search size={20} />
                     </div>
                     <input 
@@ -87,7 +87,7 @@ export default function PublicCareerPortal() {
                             >
                                 <div className="space-y-2">
                                     <h3 className="text-xl font-semibold group-hover:text-indigo-400 transition-colors">{job.title}</h3>
-                                    <div className="flex flex-wrap items-center gap-4 text-sm text-zinc-500 font-medium">
+                                    <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground font-medium">
                                         <div className="flex items-center gap-1.5 line-clamp-1">
                                             <Briefcase size={14} />
                                             {job.employmentType || "Full-time"}
@@ -109,7 +109,7 @@ export default function PublicCareerPortal() {
                         ))
                     ) : (
                         <div className="py-20 text-center space-y-4">
-                            <p className="text-zinc-500 text-lg">No open roles matching your search.</p>
+                            <p className="text-muted-foreground text-lg">No open roles matching your search.</p>
                             <Button variant="link" onClick={() => setSearchQuery("")} className="text-indigo-400">Clear all filters</Button>
                         </div>
                     )}
@@ -118,7 +118,7 @@ export default function PublicCareerPortal() {
 
             <footer className="border-t border-white/5 py-12 mt-20">
                 <div className="max-w-6xl mx-auto px-6 text-center text-zinc-600 text-sm font-medium">
-                    <p>© 2024 Powered by <span className="text-zinc-400">reckuit.ai</span> for Enterprise</p>
+                    <p>© 2024 Powered by <span className="text-muted-foreground">reckruit.ai</span> for Enterprise</p>
                 </div>
             </footer>
         </div>

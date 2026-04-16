@@ -1,14 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import api from '../api/client';
-import { 
-    Users, 
-    TrendingUp, 
-    BarChart3, 
-    Zap, 
-    ShieldCheck, 
-    ArrowUpRight, 
-    Clock, 
+import {
+    TrendingUp,
+    ShieldCheck,
+    ArrowUpRight,
+    Clock,
     FileText,
     Database,
     Globe,
@@ -82,8 +79,8 @@ export default function Dashboard() {
 
     const tabs = [
         { id: 'overview', label: 'Overview' },
-        { id: 'analytics', label: 'Commercial ROI' },
-        { id: 'compliance', label: 'Governance' }
+        { id: 'analytics', label: 'Savings & Efficiency' },
+        { id: 'compliance', label: 'Policy & Security' }
     ];
 
     return (
@@ -93,9 +90,9 @@ export default function Dashboard() {
                 <div className="space-y-1">
                     <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
                         <Activity className="size-6" />
-                        Infrastructure Dashboard
+                        Recruitment Overview
                     </h1>
-                    <p className="text-sm text-muted-foreground">Manage your recruitment infrastructure and AI processing.</p>
+                    <p className="text-sm text-muted-foreground">Manage your hiring progress and team efficiency.</p>
                 </div>
                 <div className="flex items-center gap-3">
                     <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10 border-none font-semibold text-[10px] uppercase tracking-wider h-6 px-2.5 flex items-center gap-1.5">
@@ -151,23 +148,23 @@ export default function Dashboard() {
                                             <FileText size={24} className="text-foreground" />
                                         </div>
                                         <div className="space-y-1.5">
-                                            <h3 className="text-xl font-semibold tracking-tight text-foreground">Launch New Campaign</h3>
-                                            <p className="text-muted-foreground text-sm max-w-xs mx-auto">Upload a Job Description and initiate AI-powered talent sourcing.</p>
+                                            <h3 className="text-xl font-semibold tracking-tight text-foreground">Post a New Job</h3>
+                                            <p className="text-muted-foreground text-sm max-w-xs mx-auto">Upload a job description to start matching candidates instantly.</p>
                                         </div>
                                         <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground mt-2 group-hover:underline underline-offset-4">
-                                            Start Deployment <ArrowUpRight size={14} />
+                                            Get Started <ArrowUpRight size={14} />
                                         </div>
                                     </div>
                                 </button>
                             ) : (
-                                <div className="vercel-card border-none bg-zinc-950 text-white flex flex-col justify-between p-8 relative overflow-hidden group h-[280px]">
+                                <div className="vercel-card border-none bg-primary text-primary-foreground flex flex-col justify-between p-8 relative overflow-hidden group h-[280px]">
                                     <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-105 transition-transform duration-500">
                                         <Briefcase size={120} />
                                     </div>
                                     <div className="relative z-10 space-y-1">
-                                        <h3 className="text-zinc-400 text-[10px] font-semibold uppercase tracking-wider">Active Campaign</h3>
+                                        <h3 className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider">Current Job</h3>
                                         <h2 className="text-2xl font-bold text-white tracking-tight leading-tight max-w-[80%]">{job.title}</h2>
-                                        <p className="text-zinc-500 text-sm font-medium">{job.company}</p>
+                                        <p className="text-muted-foreground text-sm font-medium">{job.company}</p>
                                     </div>
                                     <div className="relative z-10 flex flex-col sm:flex-row gap-3 pt-6 w-full">
                                         <Button 
@@ -178,10 +175,10 @@ export default function Dashboard() {
                                         </Button>
                                         <Button 
                                             variant="outline" 
-                                            className="border-zinc-800 text-white hover:bg-zinc-800 hover:text-white h-10 font-medium sm:flex-1 w-full bg-zinc-950"
+                                            className="border-zinc-800 text-white hover:bg-primary/90 hover:text-white h-10 font-medium sm:flex-1 w-full bg-primary"
                                             onClick={() => setView('pipeline')}
                                         >
-                                            Pipeline View
+                                            Hiring Pipeline
                                         </Button>
                                     </div>
                                 </div>
@@ -261,7 +258,7 @@ export default function Dashboard() {
                         {/* Recent Activity (Deployments Style) */}
                         <div className="vercel-card !p-0 overflow-hidden bg-card">
                             <div className="p-5 border-b border-border/50 flex items-center justify-between bg-muted/20">
-                                <h3 className="text-sm font-semibold text-foreground tracking-tight">Resume Deployments</h3>
+                                <h3 className="text-sm font-semibold text-foreground tracking-tight">Recent Applications</h3>
                                 <div className="flex items-center gap-1.5 opacity-70">
                                     <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
                                     <span className="text-[10px] font-semibold uppercase tracking-wider">Live Stream</span>
@@ -275,7 +272,7 @@ export default function Dashboard() {
                                                 {trend.date.split('-').pop()}
                                             </div>
                                             <div className="space-y-0.5">
-                                                <p className="font-semibold text-sm text-foreground">Batch Processing Result</p>
+                                                <p className="font-semibold text-sm text-foreground">Batch Screening Result</p>
                                                 <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                                                     <Clock size={12} className="opacity-70" /> {trend.count} Resumes evaluated • {trend.date}
                                                 </p>
@@ -305,20 +302,20 @@ export default function Dashboard() {
                         className="space-y-6"
                     >
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="vercel-card bg-zinc-950 text-white border-none relative overflow-hidden group">
+                            <div className="vercel-card bg-primary text-primary-foreground border-none relative overflow-hidden group">
                                 <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-105 transition-transform duration-500">
                                     <Globe size={100} />
                                 </div>
                                 <div className="relative z-10 space-y-6">
                                     <div>
-                                        <h3 className="text-emerald-400 font-semibold uppercase tracking-wider text-[10px] mb-1">Operational Savings</h3>
+                                        <h3 className="text-emerald-400 font-semibold uppercase tracking-wider text-[10px] mb-1">Total Savings</h3>
                                         <h2 className="text-4xl font-bold tracking-tight">₹{(roi?.costSavingsINR || 0).toLocaleString()}</h2>
                                     </div>
-                                    <p className="text-zinc-400 text-sm max-w-xs">
+                                    <p className="text-muted-foreground text-sm max-w-xs">
                                         Capital recovered through automated screening across {data.totalResumesProcessed} profiles.
                                     </p>
                                     <div className="pt-5 border-t border-zinc-800/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                        <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Benchmark: Tier-1</div>
+                                        <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Benchmark: Tier-1</div>
                                         <div className="flex items-center gap-1.5 text-emerald-400 font-semibold text-xs">
                                             High Performance <TrendingUp size={12} />
                                         </div>
@@ -330,7 +327,7 @@ export default function Dashboard() {
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-2">
                                         <Clock size={16} className="text-emerald-600" />
-                                        <h3 className="text-base font-semibold text-foreground tracking-tight">Time Equity Recovered</h3>
+                                        <h3 className="text-base font-semibold text-foreground tracking-tight">Time Saved</h3>
                                     </div>
                                     <div className="flex items-baseline gap-3">
                                         <h2 className="text-5xl font-bold text-foreground tracking-tight">{roi?.hoursSaved || 0}h</h2>
@@ -375,11 +372,11 @@ export default function Dashboard() {
                                     </div>
                                     <div className="space-y-0.5">
                                         <h4 className="font-semibold text-sm text-foreground">Regional Clusters</h4>
-                                        <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Data Locality</h3>
+                                        <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Data Privacy</h3>
                                     </div>
                                 </div>
                                 <p className="text-sm text-muted-foreground flex-1">
-                                    Sensitive PII is routed exclusively through regional nodes before processing.
+                                    Applicant data is processed securely through regional servers.
                                 </p>
                                 <div className="pt-4 border-t border-border/50">
                                     <Badge variant="secondary" className="bg-muted text-foreground border-none font-semibold text-[10px] uppercase tracking-wider h-6">Active</Badge>

@@ -1,13 +1,12 @@
 import { useApp } from '../context/AppContext';
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Settings as SettingsIcon, Bell, Shield, Globe, Cpu, Sparkles, User, Key, KeyRound } from 'lucide-react';
+import { Settings as SettingsIcon, Bell, Shield, Globe, Cpu, Sparkles, User, KeyRound } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
 export default function Settings() {
-    const { user } = useApp();
+    useApp();
 
     return (
         <div className="container mx-auto max-w-5xl px-4 py-8 space-y-8 animate-in fade-in duration-500">

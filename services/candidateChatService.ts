@@ -2,7 +2,7 @@ import { autoRoutedChatCompletion } from "./llmRouter";
 import { getMongoDb } from "../utils/mongoClient";
 import { ObjectId } from "mongodb";
 
-const EVALUATOR_SYSTEM_PROMPT = `You are the "Technical Evaluator" for Reckuit.ai.
+const EVALUATOR_SYSTEM_PROMPT = `You are the "Technical Evaluator" for Reckruit.ai.
 Your goal is to conduct a brief, 3-5 question pre-screening interview with a candidate who has just applied.
 
 PERSONA:

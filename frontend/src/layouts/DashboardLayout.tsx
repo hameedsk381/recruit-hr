@@ -12,6 +12,13 @@ import Settings from '../pages/Settings';
 import Profile from '../pages/Profile';
 import History from '../pages/History';
 import HMDashboard from '../pages/HMDashboard';
+import Requisitions from '../pages/Requisitions';
+import Offers from '../pages/Offers';
+import TalentPool from '../pages/TalentPool';
+import Referrals from '../pages/Referrals';
+import Predictions from '../pages/Predictions';
+import Knowledge from '../pages/Knowledge';
+import Fairness from '../pages/Fairness';
 import { Search, Bell, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -46,6 +53,13 @@ export default function DashboardLayout() {
             case 'settings': return <Settings />;
             case 'profile': return <Profile />;
             case 'history': return <History />;
+            case 'requisitions': return <Requisitions />;
+            case 'offers': return <Offers />;
+            case 'talent-pool': return <TalentPool />;
+            case 'referrals': return <Referrals />;
+            case 'predictions': return <Predictions />;
+            case 'knowledge': return <Knowledge />;
+            case 'fairness': return <Fairness />;
             default: return <Dashboard />;
         }
     };

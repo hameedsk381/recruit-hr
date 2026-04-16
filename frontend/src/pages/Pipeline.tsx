@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,10 +9,8 @@ import {
     Sparkles,
     MessageSquare,
     Briefcase,
-    Activity,
     Clock,
     CheckCircle2,
-    Filter
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import type { PipelineStage, ShortlistCandidate } from '../types';
@@ -37,7 +34,9 @@ export default function Pipeline() {
             technical: [],
             culture: [],
             pending: [],
-            offer: []
+            offer: [],
+            hm_approved: [],
+            hm_rejected: [],
         };
         candidates.filter(c => !c.removed).forEach(c => {
             const stage = c.stage || 'applied';

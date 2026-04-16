@@ -1,4 +1,4 @@
-# reckuit.ai
+# reckruit.ai
 
 AI-powered HR tools for resume parsing, job description analysis, and candidate matching.
 

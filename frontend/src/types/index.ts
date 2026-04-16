@@ -148,6 +148,8 @@ export interface CopilotHistoryItem {
 
 // ==================== Interview Types ====================
 
+export type MeetingPlatform = 'google_meet' | 'zoom' | 'teams' | 'slack' | 'other';
+
 export interface Interview {
     id: string;
     candidateId: string;
@@ -160,7 +162,9 @@ export interface Interview {
     endTime: string;
     status: 'scheduled' | 'completed' | 'cancelled' | 'pending';
     type: 'technical' | 'hr' | 'culture' | 'coding';
+    meetingPlatform?: MeetingPlatform;
     meetingLink?: string;
+    meetingId?: string;
     notes?: string;
     recruiterId: string;
     focusAreas?: Array<{ topic: string; why: string; sample_probe_question: string }>;

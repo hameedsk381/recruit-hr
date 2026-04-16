@@ -113,8 +113,8 @@ export default function CandidatePortal() {
                     <Sparkles size={20} />
                 </div>
                 <div>
-                    <h1 className="font-bold text-lg leading-tight" translate="no">reckuit.ai</h1>
-                    <p className="text-xs text-zinc-400 font-medium">Candidate Portal</p>
+                    <h1 className="font-bold text-lg leading-tight" translate="no">reckruit.ai</h1>
+                    <p className="text-xs text-muted-foreground font-medium">Candidate Portal</p>
                 </div>
             </div>
 
@@ -132,7 +132,7 @@ export default function CandidatePortal() {
                             </div>
                             <div className="space-y-2">
                                 <h2 className="text-3xl font-semibold tracking-tight">Audio Interview</h2>
-                                <p className="text-zinc-400 max-w-md mx-auto text-sm sm:text-base leading-relaxed">
+                                <p className="text-muted-foreground max-w-md mx-auto text-sm sm:text-base leading-relaxed">
                                     You've been invited for a brief audio check-in. Find a quiet spot, relax, and let's get started!
                                 </p>
                             </div>
@@ -149,7 +149,7 @@ export default function CandidatePortal() {
                     {status === 'generating' && (
                         <div className="space-y-6 py-12 flex flex-col items-center animate-pulse">
                             <Loader2 size={40} className="animate-spin text-indigo-400" />
-                            <p className="text-zinc-400 font-medium">Setting everything up for you...</p>
+                            <p className="text-muted-foreground font-medium">Setting everything up for you...</p>
                         </div>
                     )}
 
@@ -161,7 +161,7 @@ export default function CandidatePortal() {
                                 <h3 className="text-2xl sm:text-3xl font-medium tracking-tight leading-snug">
                                     "{questions[currentQIndex]?.question}"
                                 </h3>
-                                <p className="text-zinc-500 text-sm">{questions[currentQIndex]?.why}</p>
+                                <p className="text-muted-foreground text-sm">{questions[currentQIndex]?.why}</p>
                             </div>
 
                             <div className="flex flex-col items-center gap-6">
@@ -186,7 +186,7 @@ export default function CandidatePortal() {
                                         </Button>
                                     </div>
                                 )}
-                                {status === 'ready' && <p className="text-sm text-zinc-500">Click to start recording your answer</p>}
+                                {status === 'ready' && <p className="text-sm text-muted-foreground">Click to start recording your answer</p>}
                             </div>
                         </div>
                     )}
@@ -194,10 +194,10 @@ export default function CandidatePortal() {
                     {/* State: Processing */}
                     {status === 'processing' && (
                         <div className="space-y-6 py-12 flex flex-col items-center">
-                            <Loader2 size={40} className="animate-spin text-zinc-400" />
+                            <Loader2 size={40} className="animate-spin text-muted-foreground" />
                             <div className="space-y-1 text-center">
                                 <p className="text-zinc-200 font-medium">Saving your answer...</p>
-                                <p className="text-zinc-500 text-sm">Please wait a moment while we process your response.</p>
+                                <p className="text-muted-foreground text-sm">Please wait a moment while we process your response.</p>
                             </div>
                         </div>
                     )}
@@ -210,14 +210,14 @@ export default function CandidatePortal() {
                             </div>
                             <div className="space-y-2">
                                 <h2 className="text-2xl font-semibold">Great job!</h2>
-                                <p className="text-zinc-400">Your responses have been successfully submitted to the team.</p>
+                                <p className="text-muted-foreground">Your responses have been successfully submitted to the team.</p>
                             </div>
 
                             <div className="bg-black/50 border border-zinc-800 rounded-2xl p-6 text-left space-y-6">
                                 {/* Friendly wrap up */}
                                 <div className="text-center pb-2">
                                     <p className="text-white font-medium">We appreciate your time.</p>
-                                    <p className="text-sm text-zinc-500 mt-1">Our talent team will review your audio and reach out with next steps.</p>
+                                    <p className="text-sm text-muted-foreground mt-1">Our talent team will review your audio and reach out with next steps.</p>
                                 </div>
                             </div>
 

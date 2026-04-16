@@ -1,8 +1,8 @@
-# reckuit.ai - Frontend Architecture
+# reckruit.ai - Frontend Architecture
 
 ## Product Overview
 
-**Product:** reckuit.ai  
+**Product:** reckruit.ai  
 **Audience:** Professional recruiters hiring under time pressure  
 **Goal:** Reduce cognitive load and enable fast, defensible shortlisting
 

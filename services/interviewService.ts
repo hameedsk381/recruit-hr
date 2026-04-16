@@ -26,7 +26,7 @@ export class InterviewService {
         // Sync to External Calendar
         const calResult = await CalendarService.createEvent({
             title: `Interview: ${newInterview.candidateName} for ${newInterview.jobTitle}`,
-            description: `Technical interview scheduled via TalentAcquisition.ai\n\nNotes: ${newInterview.notes || 'None'}\nMeeting Link: ${newInterview.meetingLink}`,
+            description: `Technical interview scheduled via reckruit.ai\n\nNotes: ${newInterview.notes || 'None'}\nMeeting Link: ${newInterview.meetingLink}`,
             startTime: newInterview.startTime,
             endTime: newInterview.endTime,
             attendees: [newInterview.recruiterId]

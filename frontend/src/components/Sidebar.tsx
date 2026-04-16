@@ -1,11 +1,16 @@
 import { useApp } from '../context/AppContext';
-import { ClipboardList, Users, Cpu, LayoutDashboard, Calendar, Columns, Settings, LogOut, Clock, Sparkles } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
+import {
+    ClipboardList, Users, LayoutDashboard, Calendar, Columns, Settings,
+    LogOut, Clock, Sparkles, Briefcase, UserSearch, GitMerge, TrendingUp,
+    BookOpen, ShieldCheck, FileText, Moon, Sun, Monitor
+} from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { motion } from 'framer-motion';
 
 export default function Sidebar() {
     const { currentView, sidebarOpen, setView, job, user, logout } = useApp();
+    const { theme, setTheme } = useTheme();
 
     const isHM = user?.role === 'hiring_manager';
 
@@ -14,11 +19,18 @@ export default function Sidebar() {
         { id: 'history', label: 'Search History', icon: Clock, category: 'Main' },
         { id: 'setup', label: 'Job Setup', icon: ClipboardList, category: 'Pipeline', check: !!job, hidden: isHM },
         { id: 'shortlist', label: 'Shortlist', icon: Users, category: 'Pipeline', disabled: !job, hidden: isHM },
-        { id: 'pipeline', label: 'Kanban Board', icon: Columns, category: 'Pipeline', disabled: !job, hidden: isHM },
+        { id: 'pipeline', label: 'Hiring Pipeline', icon: Columns, category: 'Pipeline', disabled: !job, hidden: isHM },
         { id: 'interviews', label: 'Interviews', icon: Calendar, category: 'Pipeline', disabled: !job, hidden: isHM },
+        { id: 'requisitions', label: 'Requisitions', icon: FileText, category: 'Hiring', hidden: isHM },
+        { id: 'talent-pool', label: 'Talent Pool', icon: UserSearch, category: 'Hiring', hidden: isHM },
+        { id: 'referrals', label: 'Referrals', icon: GitMerge, category: 'Hiring', hidden: isHM },
+        { id: 'predictions', label: 'Hiring Insights', icon: TrendingUp, category: 'Intelligence', hidden: isHM },
+        { id: 'knowledge', label: 'Hiring Docs', icon: BookOpen, category: 'Intelligence', hidden: isHM },
+        { id: 'fairness', label: 'Bias Audit', icon: ShieldCheck, category: 'Intelligence', hidden: isHM },
+        { id: 'offers', label: 'Offers', icon: Briefcase, category: 'Hiring', hidden: isHM },
     ];
 
-    const visibleCategories = isHM ? ['Main'] : ['Main', 'Pipeline'];
+    const visibleCategories = isHM ? ['Main'] : ['Main', 'Pipeline', 'Hiring', 'Intelligence'];
 
     return (
         <aside className={cn(
@@ -29,10 +41,10 @@ export default function Sidebar() {
                 {/* Branding */}
                 <div className="flex h-16 items-center px-6 border-b">
                     <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded bg-zinc-950 text-white shadow-lg">
+                        <div className="flex h-8 w-8 items-center justify-center rounded bg-primary text-primary-foreground shadow-lg">
                             <Sparkles size={18} />
                         </div>
-                        <span className="text-lg font-black tracking-tighter uppercase whitespace-nowrap">Recrkuit Pro</span>
+                        <span className="text-lg font-black tracking-tighter uppercase whitespace-nowrap">Reckruit.ai</span>
                     </div>
                 </div>
 
@@ -55,13 +67,13 @@ export default function Sidebar() {
                                             className={cn(
                                                 "group relative flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-bold transition-all",
                                                 isActive
-                                                    ? "bg-muted text-foreground"
+                                                    ? "bg-primary text-primary-foreground shadow-md shadow-primary/20 scale-[1.02]"
                                                     : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
                                                 item.disabled && "opacity-30 cursor-not-allowed"
                                             )}
                                             disabled={item.disabled}
                                         >
-                                            <Icon size={16} className={cn("relative z-10 transition-colors", isActive ? "text-zinc-950" : "group-hover:text-zinc-950")} />
+                                            <Icon size={16} className={cn("relative z-10 transition-colors", isActive ? "text-primary-foreground" : "group-hover:text-foreground")} />
                                             <span className="relative z-10">{item.label}</span>
                                             {item.check && (
                                                 <div className="ml-auto relative z-10 size-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
@@ -74,15 +86,40 @@ export default function Sidebar() {
                     ))}
                 </nav>
 
+                {/* Theme Selector */}
+                <div className="px-6 py-4 flex items-center justify-between border-t border-border/50">
+                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Theme</span>
+                    <div className="flex bg-muted rounded-lg p-1">
+                        <button 
+                            onClick={() => setTheme('light')}
+                            className={cn("p-1.5 rounded-md transition-all", theme === 'light' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
+                        >
+                            <Sun size={14} />
+                        </button>
+                        <button 
+                            onClick={() => setTheme('dark')}
+                            className={cn("p-1.5 rounded-md transition-all", theme === 'dark' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
+                        >
+                            <Moon size={14} />
+                        </button>
+                        <button 
+                            onClick={() => setTheme('system')}
+                            className={cn("p-1.5 rounded-md transition-all", theme === 'system' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
+                        >
+                            <Monitor size={14} />
+                        </button>
+                    </div>
+                </div>
+
                 {/* User Context */}
                 <div className="p-4 border-t">
                     <div className="flex items-center gap-3 p-2 rounded-md hover:bg-muted transition-colors cursor-pointer group" onClick={() => setView('profile')}>
-                        <div className="size-8 rounded-full bg-zinc-950 text-white flex items-center justify-center font-bold text-xs">
+                        <div className="size-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-xs">
                             {user?.name?.charAt(0) || 'R'}
                         </div>
                         <div className="flex-1 min-w-0">
                             <p className="text-xs font-bold truncate">{user?.name || 'Recruiter'}</p>
-                            <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest leading-tight">Enterprise</p>
+                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest leading-tight">Enterprise</p>
                         </div>
                         <Settings size={14} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>

@@ -3,7 +3,7 @@ import { Resend } from 'resend';
 
 // Initialize Resend with API Key from environment
 const resend = new Resend(process.env.RESEND_API_KEY || 're_mock_key');
-const fromEmail = process.env.EMAIL_FROM_ADDRESS || 'interviews@talentacquisition.ai';
+const fromEmail = process.env.EMAIL_FROM_ADDRESS || 'interviews@reckruit.ai';
 
 export class EmailService {
     /**
@@ -19,7 +19,7 @@ export class EmailService {
         });
         const timeStr = startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-        const subject = `Interview Invitation: ${interview.jobTitle} with TalentAcquisition.ai`;
+        const subject = `Interview Invitation: ${interview.jobTitle} with reckruit.ai`;
         const focusAreasList = interview.focusAreas?.map(fa => `<li><strong>${fa.topic}</strong>: ${fa.why}</li>`).join('') || '<li>General Technical Review</li>';
         const sampleQuestion = interview.focusAreas?.[0]?.sample_probe_question || 'Walk us through your most challenging project.';
 
@@ -36,7 +36,7 @@ export class EmailService {
             <p>We've also added a sample question for you to think about:<br/>
             <em>"${sampleQuestion}"</em></p>
             <p>Looking forward to seeing you!</p>
-            <p>Best regards,<br/>The TalentAcquisition.ai Team</p>
+            <p>Best regards,<br/>The reckruit.ai Team</p>
         `;
 
         // If no API Key inside production, fallback to mock logs gracefully
@@ -47,7 +47,7 @@ export class EmailService {
 
         try {
             const data = await resend.emails.send({
-                from: `TalentAcquisition.ai <${fromEmail}>`,
+                from: `reckruit.ai <${fromEmail}>`,
                 to: [interview.candidateEmail],
                 subject: subject,
                 html: html
@@ -67,7 +67,7 @@ export class EmailService {
             <p>Hi ${interview.candidateName},</p>
             <p>This is to confirm that your interview for the <strong>${interview.jobTitle}</strong> position has been cancelled.</p>
             <p>If you need to reschedule or have any questions, please reply to this email.</p>
-            <p>Best regards,<br/>The TalentAcquisition.ai Team</p>
+            <p>Best regards,<br/>The reckruit.ai Team</p>
         `;
 
         if (!process.env.RESEND_API_KEY) {
@@ -77,7 +77,7 @@ export class EmailService {
 
         try {
             await resend.emails.send({
-                from: `TalentAcquisition.ai <${fromEmail}>`,
+                from: `reckruit.ai <${fromEmail}>`,
                 to: [interview.candidateEmail],
                 subject: `Interview Cancelled: ${interview.jobTitle}`,
                 html: html
@@ -108,7 +108,7 @@ export class EmailService {
                 <li>Pro-tip: <em>${interview.focusAreas?.[0]?.sample_probe_question ? `Prepare to answer: "${interview.focusAreas[0].sample_probe_question}"` : 'Be prepared to walk through your recent projects.'}</em></li>
             </ol>
             <p>See you soon!</p>
-            <p>Best regards,<br/>TalentAcquisition.ai Team</p>
+            <p>Best regards,<br/>reckruit.ai Team</p>
         `;
 
         if (!process.env.RESEND_API_KEY) {
@@ -118,7 +118,7 @@ export class EmailService {
 
         try {
             const data = await resend.emails.send({
-                from: `TalentAcquisition.ai <${fromEmail}>`,
+                from: `reckruit.ai <${fromEmail}>`,
                 to: [interview.candidateEmail],
                 subject: `Reminder: Your interview for ${interview.jobTitle} starts in 1 hour`,
                 html: html

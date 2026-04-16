@@ -2,7 +2,9 @@ import { InterviewService } from "../services/interviewService";
 import { AuthContext } from "../middleware/authMiddleware";
 import { createLogger } from "../utils/logger";
 import { WorkflowService } from "../services/workflowService";
+import { MeetingService } from "../services/meetingService";
 import { z } from "zod";
+import type { MeetingPlatform } from "../types/interview";
 
 const InterviewSchema = z.object({
     candidateId: z.string().min(1),
@@ -12,6 +14,7 @@ const InterviewSchema = z.object({
     jobTitle: z.string().min(1),
     startTime: z.string().datetime(),
     type: z.string().optional(),
+    platform: z.enum(['google_meet', 'zoom', 'teams', 'slack', 'other']).optional(),
     notes: z.string().optional(),
     focusAreas: z.array(z.string()).optional()
 });
@@ -55,10 +58,19 @@ export async function scheduleInterviewHandler(req: Request, context: AuthContex
             }
             throw error;
         }
-        const { candidateId, candidateName, candidateEmail, jobId, jobTitle, startTime, type, notes, focusAreas } = validatedData;
+        const { candidateId, candidateName, candidateEmail, jobId, jobTitle, startTime, type, platform, notes, focusAreas } = validatedData;
 
         const startTimeDate = new Date(startTime);
         const endTimeDate = new Date(startTimeDate.getTime() + 60 * 60 * 1000); // Default 1 hour
+
+        const meetingPlatform: MeetingPlatform = platform || 'google_meet';
+        const meetingResult = await MeetingService.createMeeting({
+            platform: meetingPlatform,
+            title: `Interview: ${candidateName} for ${jobTitle}`,
+            startTime: startTimeDate.toISOString(),
+            endTime: endTimeDate.toISOString(),
+            tenantId: context.tenantId
+        });
 
         const interview = await InterviewService.scheduleInterview({
             candidateId,
@@ -66,15 +78,17 @@ export async function scheduleInterviewHandler(req: Request, context: AuthContex
             candidateEmail,
             jobId,
             jobTitle,
-            tenantId: context.tenantId, // ENFORCED: Ignore body.tenantId
+            tenantId: context.tenantId,
             startTime: startTimeDate.toISOString(),
             endTime: endTimeDate.toISOString(),
             status: 'scheduled',
             type,
+            meetingPlatform: meetingPlatform,
+            meetingLink: meetingResult.meetingLink,
+            meetingId: meetingResult.meetingId,
             notes,
             recruiterId: context.userId,
-            focusAreas,
-            meetingLink: `https://meet.talentacquisition.ai/${crypto.randomUUID().slice(0, 8)}`
+            focusAreas
         });
 
         // Trigger Workflow Event

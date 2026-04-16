@@ -50,15 +50,15 @@ export default function Signup() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-zinc-50 text-foreground px-6 py-12">
+        <div className="min-h-screen flex items-center justify-center bg-muted text-foreground px-6 py-12">
             <div className="w-full max-w-sm space-y-8">
                 {/* Brand */}
                 <div className="text-center space-y-6">
-                    <Link to="/" className="inline-flex items-center gap-2" aria-label="reckuit.ai home">
+                    <Link to="/" className="inline-flex items-center gap-2" aria-label="reckruit.ai home">
                         <div className="size-9 rounded-lg bg-black text-white flex items-center justify-center">
                             <Cpu size={18} strokeWidth={2.5} />
                         </div>
-                        <span className="text-lg font-bold tracking-tight" translate="no">reckuit.ai</span>
+                        <span className="text-lg font-bold tracking-tight" translate="no">reckruit.ai</span>
                     </Link>
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight">Create your account</h1>
@@ -127,7 +127,7 @@ export default function Signup() {
                         </div>
 
                         {/* Consent — uses proper label+checkbox pattern */}
-                        <label htmlFor="signup-consent" className="flex items-start gap-3 p-3 rounded-lg bg-zinc-50 border border-border cursor-pointer select-none">
+                        <label htmlFor="signup-consent" className="flex items-start gap-3 p-3 rounded-lg bg-muted border border-border cursor-pointer select-none">
                             <div className="pt-0.5">
                                 <input
                                     type="checkbox"
@@ -154,7 +154,7 @@ export default function Signup() {
                         <Button
                             type="submit"
                             disabled={loading}
-                            className="w-full h-11 bg-black text-white hover:bg-zinc-800 font-semibold rounded-lg gap-2"
+                            className="w-full h-11 bg-black text-white hover:bg-primary/90 font-semibold rounded-lg gap-2"
                             style={{ transition: 'background-color 150ms ease, opacity 150ms ease' }}
                         >
                             {loading && <Loader2 size={16} className="animate-spin" />}

@@ -46,7 +46,7 @@ import {
   getActiveStateHandler,
   updateCandidateHandler
 } from "./routes/recruiterState";
-import { getTenantSettingsHandler, updateTenantSettingsHandler } from "./routes/tenantSettings";
+import { getTenantSettingsHandler, updateTenantSettingsHandler, updateBlindScreeningHandler } from "./routes/tenantSettings";
 import { getPublicJobsHandler, publishJobHandler } from "./routes/publicJobs";
 import { publicApplyHandler, getApplicationStatusHandler } from "./routes/candidatePortal";
 import { candidateChatHandler } from "./routes/candidateChat";
@@ -54,6 +54,54 @@ import { ssoInitHandler, ssoCallbackHandler } from "./routes/sso";
 import { rateLimitMiddleware } from "./middleware/rateLimiter";
 import { ROLES } from "./utils/permissions";
 import { initializeWorkflow } from "./services/workflowService";
+
+// Phase 1 — v1 routes
+import { healthHandler, readyHandler, metricsHandler } from "./routes/health";
+
+// Phase 3 — v1 routes
+import {
+  createVideoSessionHandler, getVideoSessionHandler,
+  listVideoSessionsHandler, videoWebhookHandler
+} from "./routes/v1/videoInterviews";
+import {
+  ingestDocumentHandler, queryKnowledgeHandler,
+  listDocumentsHandler, deleteDocumentHandler
+} from "./routes/v1/knowledge";
+import { scanJDHandler, generateBiasReportHandler } from "./routes/v1/fairness";
+import {
+  predictOfferAcceptanceHandler, predictTimeToFillHandler,
+  predictRetentionRiskHandler, recordOutcomeHandler, getAIWeightsHandler
+} from "./routes/v1/predictions";
+
+// Phase 2 — v1 routes
+import {
+  listJobPostingsHandler, publishJobPostingHandler, getJobPostingMetricsHandler,
+  unpublishJobPostingHandler, syncApplicationsHandler
+} from "./routes/v1/jobPostings";
+import {
+  searchTalentPoolHandler, addToTalentPoolHandler, getTalentProfileHandler,
+  updateTalentProfileHandler, enrollNurtureHandler, bulkImportHandler
+} from "./routes/v1/talentPool";
+import {
+  submitReferralHandler, listReferralsHandler, updateReferralStatusHandler, payReferralBonusHandler
+} from "./routes/v1/referrals";
+import {
+  listSequencesHandler, createSequenceHandler,
+  sendOutreachEmailHandler, listOutreachHandler, outreachTrackingWebhook
+} from "./routes/v1/nurture";
+import {
+  listRequisitionsHandler, createRequisitionHandler, getRequisitionHandler,
+  updateRequisitionHandler, approveRequisitionHandler, publishRequisitionHandler,
+  deleteRequisitionHandler
+} from "./routes/v1/requisitions";
+import {
+  createOfferHandler, getOfferHandler, updateOfferHandler, sendOfferHandler,
+  approveOfferHandler, withdrawOfferHandler, listOfferTemplatesHandler,
+  createOfferTemplateHandler, esignWebhookHandler
+} from "./routes/v1/offers";
+import {
+  initiateBGVHandler, getBGVHandler, bgvWebhookHandler, decideBGVHandler
+} from "./routes/v1/bgv";
 
 // Load environment variables
 config();
@@ -118,11 +166,22 @@ async function startServer() {
           return new Response(null, { status: 204, headers: corsHeaders });
         }
 
+        // Phase 1 & 2: Unversioned health + public webhook endpoints
+        if (url.pathname === "/ready")   return addCors(await readyHandler(req));
+        if (url.pathname === "/metrics") return addCors(await metricsHandler(req));
+        if (req.method === "POST" && url.pathname === "/webhooks/esign") return addCors(await esignWebhookHandler(req));
+        if (req.method === "POST" && url.pathname === "/webhooks/bgv")   return addCors(await bgvWebhookHandler(req));
+        if (req.method === "POST" && url.pathname === "/webhooks/outreach/tracking") return addCors(await outreachTrackingWebhook(req));
+        if (req.method === "POST" && url.pathname === "/webhooks/video") return addCors(await videoWebhookHandler(req));
+
         // Public Routes
         const PUBLIC_ROUTES = [
-          "/", "/health", "/mongo-info", "/auth/login", "/auth/register",
+          "/", "/health", "/ready", "/metrics", "/mongo-info", "/auth/login", "/auth/register",
           "/auth/sso/init", "/auth/sso/callback", "/public/jobs",
-          "/public/apply", "/public/track", "/public/chat"
+          "/public/apply", "/public/track", "/public/chat",
+          "/webhooks/esign", "/webhooks/bgv", "/v1/bgv/webhook",
+          "/webhooks/outreach/tracking",
+          "/webhooks/video",
         ];
 
         // Auth Context
@@ -144,19 +203,8 @@ async function startServer() {
             return addCors(response);
           }
 
-          if (req.method === "GET" && url.pathname === "/health") {
-            const db = getMongoDb();
-            const health = {
-              status: "UP",
-              timestamp: new Date().toISOString(),
-              services: {
-                database: db ? "CONNECTED" : "DISCONNECTED",
-                redis: "CONNECTED",
-                uptime: Math.round(process.uptime())
-              }
-            };
-            const status = health.services.database === "CONNECTED" ? 200 : 503;
-            const response = new Response(JSON.stringify(health), { status, headers: { "Content-Type": "application/json" } });
+          if (req.method === "GET" && (url.pathname === "/health" || url.pathname === "/v1/health")) {
+            const response = await healthHandler(req);
             logRequest(req, startTime, response.status);
             return addCors(response);
           }
@@ -407,6 +455,12 @@ async function startServer() {
             return addCors(response);
           }
 
+          if (req.method === "PATCH" && url.pathname === "/v1/settings/blind-screening") {
+            const response = await updateBlindScreeningHandler(req, context);
+            logRequest(req, startTime, response.status);
+            return addCors(response);
+          }
+
           if (req.method === "GET" && url.pathname === "/public/jobs") {
             const response = await getPublicJobsHandler(req);
             logRequest(req, startTime, response.status);
@@ -469,6 +523,207 @@ async function startServer() {
             logRequest(req, startTime, response.status);
             return addCors(response);
           }
+
+          // ─── Phase 1 v1 Routes ───────────────────────────────────────────
+
+          // Requisitions
+          if (req.method === "GET" && url.pathname === "/v1/requisitions") {
+            const response = await listRequisitionsHandler(req, context);
+            logRequest(req, startTime, response.status); return addCors(response);
+          }
+          if (req.method === "POST" && url.pathname === "/v1/requisitions") {
+            const response = await createRequisitionHandler(req, context);
+            logRequest(req, startTime, response.status); return addCors(response);
+          }
+          const reqMatch = url.pathname.match(/^\/v1\/requisitions\/([^/]+)$/);
+          if (reqMatch) {
+            const id = reqMatch[1];
+            if (req.method === "GET")    { const r = await getRequisitionHandler(req, context, id); logRequest(req, startTime, r.status); return addCors(r); }
+            if (req.method === "PATCH")  { const r = await updateRequisitionHandler(req, context, id); logRequest(req, startTime, r.status); return addCors(r); }
+            if (req.method === "DELETE") { const r = await deleteRequisitionHandler(req, context, id); logRequest(req, startTime, r.status); return addCors(r); }
+          }
+          const reqApprove = url.pathname.match(/^\/v1\/requisitions\/([^/]+)\/approve$/);
+          if (reqApprove && req.method === "POST") {
+            const r = await approveRequisitionHandler(req, context, reqApprove[1]); logRequest(req, startTime, r.status); return addCors(r);
+          }
+          const reqPublish = url.pathname.match(/^\/v1\/requisitions\/([^/]+)\/publish$/);
+          if (reqPublish && req.method === "POST") {
+            const r = await publishRequisitionHandler(req, context, reqPublish[1]); logRequest(req, startTime, r.status); return addCors(r);
+          }
+
+          // Offers
+          if (req.method === "POST" && url.pathname === "/v1/offers") {
+            const response = await createOfferHandler(req, context);
+            logRequest(req, startTime, response.status); return addCors(response);
+          }
+          if (req.method === "GET" && url.pathname === "/v1/offers/templates") {
+            const r = await listOfferTemplatesHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          }
+          if (req.method === "POST" && url.pathname === "/v1/offers/templates") {
+            const r = await createOfferTemplateHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          }
+          const offerMatch = url.pathname.match(/^\/v1\/offers\/([^/]+)$/);
+          if (offerMatch) {
+            const id = offerMatch[1];
+            if (req.method === "GET")   { const r = await getOfferHandler(req, context, id); logRequest(req, startTime, r.status); return addCors(r); }
+            if (req.method === "PATCH") { const r = await updateOfferHandler(req, context, id); logRequest(req, startTime, r.status); return addCors(r); }
+          }
+          const offerSend = url.pathname.match(/^\/v1\/offers\/([^/]+)\/send$/);
+          if (offerSend && req.method === "POST") {
+            const r = await sendOfferHandler(req, context, offerSend[1]); logRequest(req, startTime, r.status); return addCors(r);
+          }
+          const offerApprove = url.pathname.match(/^\/v1\/offers\/([^/]+)\/approve$/);
+          if (offerApprove && req.method === "POST") {
+            const r = await approveOfferHandler(req, context, offerApprove[1]); logRequest(req, startTime, r.status); return addCors(r);
+          }
+          const offerWithdraw = url.pathname.match(/^\/v1\/offers\/([^/]+)\/withdraw$/);
+          if (offerWithdraw && req.method === "POST") {
+            const r = await withdrawOfferHandler(req, context, offerWithdraw[1]); logRequest(req, startTime, r.status); return addCors(r);
+          }
+
+          // BGV
+          if (req.method === "POST" && url.pathname === "/v1/bgv") {
+            const r = await initiateBGVHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          }
+          if (req.method === "POST" && url.pathname === "/v1/bgv/webhook") {
+            const r = await bgvWebhookHandler(req); logRequest(req, startTime, r.status); return addCors(r);
+          }
+          const bgvMatch = url.pathname.match(/^\/v1\/bgv\/([^/]+)$/);
+          if (bgvMatch) {
+            const id = bgvMatch[1];
+            if (req.method === "GET") { const r = await getBGVHandler(req, context, id); logRequest(req, startTime, r.status); return addCors(r); }
+          }
+          const bgvDecide = url.pathname.match(/^\/v1\/bgv\/([^/]+)\/decide$/);
+          if (bgvDecide && req.method === "POST") {
+            const r = await decideBGVHandler(req, context, bgvDecide[1]); logRequest(req, startTime, r.status); return addCors(r);
+          }
+
+          // ─── Phase 2 v1 Routes ───────────────────────────────────────────
+
+          // Job Postings
+          if (req.method === "GET" && url.pathname === "/v1/job-postings") {
+            const r = await listJobPostingsHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          }
+          if (req.method === "POST" && url.pathname === "/v1/job-postings") {
+            const r = await publishJobPostingHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          }
+          const jpMatch = url.pathname.match(/^\/v1\/job-postings\/([^/]+)$/);
+          if (jpMatch) {
+            const id = jpMatch[1];
+            if (req.method === "GET")    { const r = await getJobPostingMetricsHandler(req, context, id); logRequest(req, startTime, r.status); return addCors(r); }
+            if (req.method === "DELETE") { const r = await unpublishJobPostingHandler(req, context, id); logRequest(req, startTime, r.status); return addCors(r); }
+          }
+          const jpSync = url.pathname.match(/^\/v1\/job-postings\/([^/]+)\/sync$/);
+          if (jpSync && req.method === "POST") {
+            const r = await syncApplicationsHandler(req, context, jpSync[1]); logRequest(req, startTime, r.status); return addCors(r);
+          }
+
+          // Talent Pool
+          if (req.method === "GET" && url.pathname === "/v1/talent-pool") {
+            const r = await searchTalentPoolHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          }
+          if (req.method === "POST" && url.pathname === "/v1/talent-pool") {
+            const r = await addToTalentPoolHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          }
+          if (req.method === "POST" && url.pathname === "/v1/talent-pool/bulk-import") {
+            const r = await bulkImportHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          }
+          const tpMatch = url.pathname.match(/^\/v1\/talent-pool\/([^/]+)$/);
+          if (tpMatch) {
+            const id = tpMatch[1];
+            if (req.method === "GET")   { const r = await getTalentProfileHandler(req, context, id); logRequest(req, startTime, r.status); return addCors(r); }
+            if (req.method === "PATCH") { const r = await updateTalentProfileHandler(req, context, id); logRequest(req, startTime, r.status); return addCors(r); }
+          }
+          const tpNurture = url.pathname.match(/^\/v1\/talent-pool\/([^/]+)\/nurture$/);
+          if (tpNurture && req.method === "POST") {
+            const r = await enrollNurtureHandler(req, context, tpNurture[1]); logRequest(req, startTime, r.status); return addCors(r);
+          }
+
+          // Referrals
+          if (req.method === "POST" && url.pathname === "/v1/referrals") {
+            const r = await submitReferralHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          }
+          if (req.method === "GET" && url.pathname === "/v1/referrals") {
+            const r = await listReferralsHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          }
+          const refMatch = url.pathname.match(/^\/v1\/referrals\/([^/]+)\/status$/);
+          if (refMatch && req.method === "PATCH") {
+            const r = await updateReferralStatusHandler(req, context, refMatch[1]); logRequest(req, startTime, r.status); return addCors(r);
+          }
+          const refBonus = url.pathname.match(/^\/v1\/referrals\/([^/]+)\/bonus$/);
+          if (refBonus && req.method === "POST") {
+            const r = await payReferralBonusHandler(req, context, refBonus[1]); logRequest(req, startTime, r.status); return addCors(r);
+          }
+
+          // Nurture Sequences & Outreach
+          if (req.method === "GET" && url.pathname === "/v1/nurture/sequences") {
+            const r = await listSequencesHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          }
+          if (req.method === "POST" && url.pathname === "/v1/nurture/sequences") {
+            const r = await createSequenceHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          }
+          if (req.method === "POST" && url.pathname === "/v1/outreach/send-email") {
+            const r = await sendOutreachEmailHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          }
+          if (req.method === "GET" && url.pathname === "/v1/outreach") {
+            const r = await listOutreachHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          }
+
+          // ─── Phase 3 v1 Routes ───────────────────────────────────────────
+
+          // Video Interviews
+          if (req.method === "GET" && url.pathname === "/v1/video-sessions") {
+            const r = await listVideoSessionsHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          }
+          if (req.method === "POST" && url.pathname === "/v1/video-sessions") {
+            const r = await createVideoSessionHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          }
+          const videoMatch = url.pathname.match(/^\/v1\/video-sessions\/([^/]+)$/);
+          if (videoMatch) {
+            if (req.method === "GET") { const r = await getVideoSessionHandler(req, context, videoMatch[1]); logRequest(req, startTime, r.status); return addCors(r); }
+          }
+
+          // Knowledge / RAG
+          if (req.method === "GET" && url.pathname === "/v1/knowledge") {
+            const r = await listDocumentsHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          }
+          if (req.method === "POST" && url.pathname === "/v1/knowledge/ingest") {
+            const r = await ingestDocumentHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          }
+          if (req.method === "POST" && url.pathname === "/v1/knowledge/query") {
+            const r = await queryKnowledgeHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          }
+          const knowledgeMatch = url.pathname.match(/^\/v1\/knowledge\/([^/]+)$/);
+          if (knowledgeMatch && req.method === "DELETE") {
+            const r = await deleteDocumentHandler(req, context, knowledgeMatch[1]); logRequest(req, startTime, r.status); return addCors(r);
+          }
+
+          // Fairness / Bias Detection
+          if (req.method === "POST" && url.pathname === "/v1/fairness/scan-jd") {
+            const r = await scanJDHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          }
+          if (req.method === "POST" && url.pathname === "/v1/fairness/report") {
+            const r = await generateBiasReportHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          }
+
+          // Predictive Models
+          if (req.method === "POST" && url.pathname === "/v1/predictions/offer-acceptance") {
+            const r = await predictOfferAcceptanceHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          }
+          if (req.method === "POST" && url.pathname === "/v1/predictions/time-to-fill") {
+            const r = await predictTimeToFillHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          }
+          if (req.method === "POST" && url.pathname === "/v1/predictions/retention-risk") {
+            const r = await predictRetentionRiskHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          }
+          if (req.method === "POST" && url.pathname === "/v1/predictions/outcomes") {
+            const r = await recordOutcomeHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          }
+          if (req.method === "GET" && url.pathname === "/v1/predictions/weights") {
+            const r = await getAIWeightsHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          }
+
+          // ─────────────────────────────────────────────────────────────────
 
           logRequest(req, startTime, 404);
           return addCors(new Response(JSON.stringify({ error: "Route not found" }), { status: 404 }));

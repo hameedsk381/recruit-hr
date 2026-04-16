@@ -1,4 +1,4 @@
-# reckuit.ai — Enterprise Recruitment Automation OS
+# reckruit.ai — Enterprise Recruitment Automation OS
 ## Implementation Plan & Technical Documentation
 
 **Version:** 1.0  
@@ -29,11 +29,11 @@
 
 ## 1. Vision & Objective
 
-**Product Vision:** reckuit.ai is the AI-native Recruitment Automation OS for enterprises — covering the full hiring lifecycle from workforce planning and sourcing through to onboarding, with AI accelerating every stage while humans retain every decision.
+**Product Vision:** reckruit.ai is the AI-native Recruitment Automation OS for enterprises — covering the full hiring lifecycle from workforce planning and sourcing through to onboarding, with AI accelerating every stage while humans retain every decision.
 
 **What "OS" means:**
-- Every hiring workflow runs inside reckuit.ai, not across disconnected tools
-- Third-party tools (ATS, HRIS, BGV, job boards) integrate into reckuit.ai, not the other way around
+- Every hiring workflow runs inside reckruit.ai, not across disconnected tools
+- Third-party tools (ATS, HRIS, BGV, job boards) integrate into reckruit.ai, not the other way around
 - AI compounds with each hire — the system gets smarter from tenant data
 
 **Non-negotiable principles (inherited from `ENTERPRISE_ARCHITECTURE.md`):**
@@ -194,10 +194,10 @@ export async function readyHandler(_req: Request): Promise<Response> {
 
 export async function metricsHandler(_req: Request): Promise<Response> {
   // Returns Prometheus text format:
-  // reckuit_requests_total{method, route, status} counter
-  // reckuit_inference_duration_seconds{model} histogram
-  // reckuit_active_tenants gauge
-  // reckuit_queue_depth{queue_name} gauge
+  // reckruit_requests_total{method, route, status} counter
+  // reckruit_inference_duration_seconds{model} histogram
+  // reckruit_active_tenants gauge
+  // reckruit_queue_depth{queue_name} gauge
 }
 ```
 
@@ -489,7 +489,7 @@ interface ATSConnector {
 ## 5. Phase 2 — Sourcing & Top-of-Funnel
 
 **Timeline:** Months 3–6  
-**Goal:** reckuit.ai becomes the place where hiring *starts*, not just where applications are processed.
+**Goal:** reckruit.ai becomes the place where hiring *starts*, not just where applications are processed.
 
 ---
 
@@ -1025,11 +1025,11 @@ interface OnboardingTask {
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: reckuit-api
+  name: reckruit-api
 spec:
   scaleTargetRef:
     kind: Deployment
-    name: reckuit-api
+    name: reckruit-api
   minReplicas: 2
   maxReplicas: 20
   metrics:
@@ -1130,7 +1130,7 @@ interface APIKey {
 ## 8. Phase 5 — Marketplace & Ecosystem
 
 **Timeline:** Months 10–14  
-**Goal:** Platform network effects. Partners integrate *into* reckuit.ai.
+**Goal:** Platform network effects. Partners integrate *into* reckruit.ai.
 
 ### 8.1 Integration Marketplace
 - Registry of 50+ connectors: payroll (ADP, Darwinbox), HRMS (Workday, SAP HCM), collaboration (Slack, Teams, Notion), assessments (HackerRank, Codility)
@@ -1441,9 +1441,9 @@ services:
 ┌──────────────────▼──────────────────────┐
 │     Kubernetes Cluster                   │
 │  ┌──────────────────────────────────┐   │
-│  │  reckuit-api  (2–20 pods, HPA)   │   │
-│  │  reckuit-worker (queue consumers)│   │
-│  │  reckuit-temporal-worker         │   │
+│  │  reckruit-api  (2–20 pods, HPA)   │   │
+│  │  reckruit-worker (queue consumers)│   │
+│  │  reckruit-temporal-worker         │   │
 │  └──────────────────────────────────┘   │
 └──────────────────┬──────────────────────┘
                    │
@@ -1478,12 +1478,12 @@ jobs:
     - tag with git SHA
   
   deploy-staging:
-    - helm upgrade reckuit-staging
+    - helm upgrade reckruit-staging
     - smoke tests against /v1/health
   
   deploy-production:
     - manual approval gate
-    - helm upgrade reckuit-prod (rolling update)
+    - helm upgrade reckruit-prod (rolling update)
     - verify HPA, monitor error rate 5 min
     - auto-rollback if error rate > 2%
 ```
@@ -1570,4 +1570,4 @@ Unit Tests (60%)
 
 ---
 
-*Document maintained by the reckuit.ai engineering team. Update this document when architecture decisions change. Major version bump required for any breaking API change.*
+*Document maintained by the reckruit.ai engineering team. Update this document when architecture decisions change. Major version bump required for any breaking API change.*

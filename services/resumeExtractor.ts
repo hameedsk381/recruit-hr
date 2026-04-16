@@ -9,6 +9,10 @@ export interface ResumeData {
   name: string;
   email: string;
   phone: string;
+  linkedin?: string;
+  photo?: string;
+  address?: string;
+  nationality?: string;
   skills: string[];
   experience: string[];
   education: string[];
@@ -17,6 +21,35 @@ export interface ResumeData {
   domainExperience: string[];
   totalIndustrialExperienceYears: number;
   totalDomainExperienceYears: number;
+}
+
+export interface BlindScreeningSettings {
+  enabled: boolean;
+  redactFields: Array<'name' | 'email' | 'phone' | 'photo' | 'address' | 'linkedin' | 'nationality'>;
+  revealAfterStage: 'shortlist' | 'interview' | 'offer' | 'never';
+}
+
+/**
+ * Apply blind screening to a resume — redact PII fields per tenant settings.
+ * Keeps skills, experience, education, certifications intact.
+ */
+export function applyBlindMode(resume: ResumeData, settings: BlindScreeningSettings): ResumeData {
+  if (!settings.enabled) return resume;
+
+  const redact = (field: BlindScreeningSettings['redactFields'][number]) =>
+    settings.redactFields.includes(field) ? '[REDACTED]' : undefined;
+
+  return {
+    ...resume,
+    name: redact('name') ?? resume.name,
+    email: redact('email') ?? resume.email,
+    phone: redact('phone') ?? resume.phone,
+    linkedin: redact('linkedin') ?? resume.linkedin,
+    photo: redact('photo') ? '[REDACTED]' : resume.photo,
+    address: redact('address') ?? resume.address,
+    nationality: redact('nationality') ?? resume.nationality,
+    // Skills, experience, education, certifications are NEVER redacted
+  };
 }
 
 // (Import moved to top)

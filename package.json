@@ -1,5 +1,5 @@
 {
-  "name": "reckuit-ai",
+  "name": "reckruit-ai",
   "version": "1.0.0",
   "description": "AI-powered HR tools for resume parsing, job description analysis, and candidate matching",
   "main": "index.ts",
@@ -49,6 +49,6 @@
     "job-description",
     "matching"
   ],
-  "author": "reckuit.ai Team",
+  "author": "reckruit.ai Team",
   "license": "MIT"
 }

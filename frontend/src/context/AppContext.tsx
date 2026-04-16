@@ -38,7 +38,7 @@ interface AppState {
     interviewsLoading: boolean;
 
     // UI
-    currentView: 'dashboard' | 'setup' | 'shortlist' | 'detail' | 'interviews' | 'pipeline' | 'settings' | 'profile' | 'history';
+    currentView: 'dashboard' | 'setup' | 'shortlist' | 'detail' | 'interviews' | 'pipeline' | 'settings' | 'profile' | 'history' | 'requisitions' | 'offers' | 'talent-pool' | 'referrals' | 'predictions' | 'knowledge' | 'fairness';
     setupStep: 'upload-jd' | 'verify-profile' | 'bulk-resumes' | 'review-launch';
     campaignFiles: File[];
     sidebarOpen: boolean;

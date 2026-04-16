@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import api from '../api/client';
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -13,6 +12,13 @@ import {
     DialogFooter,
 } from "@/components/ui/dialog";
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import {
     Calendar,
     Clock,
     Video,
@@ -20,15 +26,11 @@ import {
     ExternalLink,
     CalendarDays,
     Sparkles,
-    Target,
     HelpCircle,
     XCircle,
     RotateCcw,
-    CheckCircle2,
     ClipboardList,
-    Mail,
     CalendarCheck,
-    ChevronRight,
     Users
 } from 'lucide-react';
 import ScorecardDialog from '../components/ScorecardDialog';
@@ -40,7 +42,10 @@ export default function Interviews() {
         setInterviews,
         interviewsLoading,
         setInterviewsLoading,
-        setView
+        candidates,
+        setView,
+        addInterview,
+        selectCandidate
     } = useApp();
 
     const [rescheduleData, setRescheduleData] = useState<{ id: string, candidateId: string } | null>(null);
@@ -53,11 +58,22 @@ export default function Interviews() {
     const [statusFilter, setStatusFilter] = useState<'all' | 'scheduled' | 'completed' | 'cancelled'>('all');
     const [calendarStatus, setCalendarStatus] = useState<{ connected: boolean; email: string | null; provider: string | null } | null>(null);
     const [isConnecting, setIsConnecting] = useState(false);
+    const [scheduleCandidate, setScheduleCandidate] = useState<any | null>(null);
+    const [scheduleDate, setScheduleDate] = useState('');
+    const [scheduleTime, setScheduleTime] = useState('');
+    const [scheduleType, setScheduleType] = useState<'technical' | 'culture'>('technical');
+    const [schedulePlatform, setSchedulePlatform] = useState<'google_meet' | 'zoom' | 'teams' | 'slack' | 'other'>('google_meet');
 
     const filteredInterviews = interviews.filter(interview => {
         if (statusFilter === 'all') return true;
         return interview.status === statusFilter;
     });
+
+    const shortlistedCandidates = candidates.filter(c => 
+        !c.removed && 
+        (c.stage === 'shortlisted' || c.stage === 'applied') &&
+        !interviews.some(i => i.candidateId === c.id && i.status === 'scheduled')
+    );
 
     const fetchInterviews = async () => {
         setInterviewsLoading(true);
@@ -93,7 +109,7 @@ export default function Interviews() {
         setIsConnecting(true);
         // Simulate OAuth Redirect/Success
         try {
-            const res = await api.connectCalendar('recruiter@talentacquisition.ai');
+            const res = await api.connectCalendar('recruiter@reckruit.ai');
             if (res.success) {
                 await fetchCalendarStatus();
             }
@@ -147,6 +163,37 @@ export default function Interviews() {
             }
         } catch (err) {
             console.error('Cancel failed', err);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const confirmSchedule = async () => {
+        if (!scheduleCandidate || !scheduleDate || !scheduleTime) return;
+        setIsProcessing(true);
+        try {
+            const startTime = new Date(`${scheduleDate}T${scheduleTime}`).toISOString();
+            const res = await api.scheduleInterview({
+                candidateId: scheduleCandidate.id,
+                candidateName: scheduleCandidate.profile.name,
+                candidateEmail: scheduleCandidate.profile.email || 'candidate@example.com',
+                jobId: 'current-job',
+                jobTitle: 'Open Position',
+                startTime,
+                type: scheduleType,
+                platform: schedulePlatform,
+                notes: ''
+            });
+            if (res.success) {
+                addInterview(res.interview);
+                setScheduleCandidate(null);
+                setScheduleDate('');
+                setScheduleTime('');
+                setScheduleType('technical');
+                setSchedulePlatform('google_meet');
+            }
+        } catch (err) {
+            console.error('Schedule failed', err);
         } finally {
             setIsProcessing(false);
         }
@@ -229,20 +276,78 @@ export default function Interviews() {
                 })}
             </div>
 
-            {filteredInterviews.length === 0 ? (
+            {/* Shortlisted Candidates Panel */}
+            {shortlistedCandidates.length > 0 && (
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                            <Users className="size-5" />
+                            Shortlisted Candidates
+                        </h2>
+                        <Badge variant="secondary" className="px-2 py-0.5 text-xs font-semibold">
+                            {shortlistedCandidates.length} pending
+                        </Badge>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {shortlistedCandidates.map((candidate) => (
+                            <div key={candidate.id} className="vercel-card !p-4 space-y-3 bg-card hover:border-foreground/20 transition-all">
+                                <div className="flex items-start justify-between">
+                                    <div className="space-y-1 min-w-0">
+                                        <h3 className="text-base font-semibold text-foreground truncate">{candidate.profile.name}</h3>
+                                        <p className="text-xs text-muted-foreground truncate">{candidate.assessment.one_line_summary}</p>
+                                    </div>
+                                    <Badge variant="outline" className="shrink-0 ml-2 text-[10px] font-semibold uppercase tracking-wider">
+                                        {candidate.assessment.fit_assessment.overall_fit} fit
+                                    </Badge>
+                                </div>
+                                <div className="flex flex-wrap gap-1.5 pt-1">
+                                    {candidate.assessment.strengths.slice(0, 2).map((s, i) => (
+                                        <span key={i} className="text-[10px] font-medium text-foreground/80 bg-muted px-2 py-0.5 rounded-md border border-border/50">
+                                            {s.skill}
+                                        </span>
+                                    ))}
+                                </div>
+                                <div className="flex gap-2 pt-2">
+                                    <Button 
+                                        variant="default" 
+                                        size="sm" 
+                                        className="flex-1 h-8 text-xs font-semibold"
+                                        onClick={() => setScheduleCandidate(candidate)}
+                                    >
+                                        <Calendar className="size-3.5 mr-1.5" />
+                                        Schedule
+                                    </Button>
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm" 
+                                        className="h-8 text-xs font-semibold"
+                                        onClick={() => selectCandidate(candidate.id)}
+                                    >
+                                        View
+                                    </Button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {filteredInterviews.length === 0 && shortlistedCandidates.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 rounded-xl border border-dashed border-border/60 bg-muted/20">
                     <div className="p-4 bg-muted/50 rounded-full">
                         <CalendarDays className="size-10 text-muted-foreground/60" />
                     </div>
                     <div className="max-w-xs">
-                        <h3 className="text-sm font-semibold text-foreground">
+<h3 className="text-sm font-semibold text-foreground">
                             {statusFilter === 'all' ? 'No interviews scheduled' : `No ${statusFilter} interviews`}
                         </h3>
                         <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
-                            {statusFilter === 'all'
+                            {statusFilter === 'all' && shortlistedCandidates.length === 0
                                 ? 'Go to your shortlist and select "Schedule" for any candidate to get started.'
+                                : statusFilter === 'all'
+                                ? `You have ${shortlistedCandidates.length} shortlisted candidates waiting to be scheduled.`
                                 : `There are no interviews with status "${statusFilter}" at this time.`
-                            }
+                        }
                         </p>
                     </div>
                     {statusFilter === 'all' && (
@@ -500,6 +605,77 @@ export default function Interviews() {
                     }}
                 />
             )}
+
+            {/* Schedule Candidate Dialog */}
+            <Dialog open={!!scheduleCandidate} onOpenChange={(open) => !open && setScheduleCandidate(null)}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Schedule Interview</DialogTitle>
+                        <DialogDescription>
+                            Schedule an interview for {scheduleCandidate?.profile.name}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <label className="text-xs font-semibold text-foreground">Interview Type</label>
+                            <Select value={scheduleType} onValueChange={(val: any) => setScheduleType(val)}>
+                                <SelectTrigger className="h-9">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="technical">Technical Round</SelectItem>
+                                    <SelectItem value="culture">Culture Fit</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-xs font-semibold text-foreground">Meeting Platform</label>
+                            <Select value={schedulePlatform} onValueChange={(val: any) => setSchedulePlatform(val)}>
+                                <SelectTrigger className="h-9">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="google_meet">Google Meet</SelectItem>
+                                    <SelectItem value="zoom">Zoom</SelectItem>
+                                    <SelectItem value="teams">Microsoft Teams</SelectItem>
+                                    <SelectItem value="slack">Slack Huddle</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-xs font-semibold text-foreground">Date</label>
+                                <input 
+                                    type="date" 
+                                    value={scheduleDate}
+                                    onChange={(e) => setScheduleDate(e.target.value)}
+                                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-xs font-semibold text-foreground">Time</label>
+                                <input 
+                                    type="time" 
+                                    value={scheduleTime}
+                                    onChange={(e) => setScheduleTime(e.target.value)}
+                                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <DialogFooter className="mt-4 gap-2 sm:gap-0">
+                        <Button variant="outline" onClick={() => setScheduleCandidate(null)}>Cancel</Button>
+                        <Button
+                            onClick={confirmSchedule}
+                            disabled={!scheduleDate || !scheduleTime || isProcessing}
+                            className="gap-2"
+                        >
+                            {isProcessing ? <RotateCcw className="size-4 animate-spin" /> : <CalendarCheck className="size-4" />}
+                            Schedule Interview
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

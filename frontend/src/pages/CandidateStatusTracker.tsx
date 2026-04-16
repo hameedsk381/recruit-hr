@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api/client';
-import { CheckCircle2, Circle, Clock, Sparkles, Building2, Calendar, FileText, ArrowLeft, Loader2 } from 'lucide-react';
+import { CheckCircle2, Circle, Clock, Sparkles, Building2, Calendar, FileText, Loader2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 
 export default function CandidateStatusTracker() {
@@ -38,7 +38,7 @@ export default function CandidateStatusTracker() {
     ];
 
     if (loading) return (
-        <div className="min-h-screen bg-black flex flex-col items-center justify-center text-zinc-500 gap-4">
+        <div className="min-h-screen bg-black flex flex-col items-center justify-center text-muted-foreground gap-4">
             <Loader2 className="animate-spin" size={32} />
             <p className="font-medium animate-pulse">Verifying magic link...</p>
         </div>
@@ -51,7 +51,7 @@ export default function CandidateStatusTracker() {
             </div>
             <div className="space-y-2">
                 <h1 className="text-2xl font-bold">Magic Link Expired</h1>
-                <p className="text-zinc-400 max-w-sm">This link is no longer valid or has expired. Please contact the recruiter for a new link.</p>
+                <p className="text-muted-foreground max-w-sm">This link is no longer valid or has expired. Please contact the recruiter for a new link.</p>
             </div>
             <Button onClick={() => navigate('/')} className="bg-white text-black hover:bg-zinc-200 px-8 rounded-xl font-bold">Go Home</Button>
         </div>
@@ -65,9 +65,9 @@ export default function CandidateStatusTracker() {
                         <div className="size-8 rounded-lg bg-indigo-600 flex items-center justify-center">
                             <Sparkles size={18} />
                         </div>
-                        <span className="font-bold">reckuit.ai</span>
+                        <span className="font-bold">reckruit.ai</span>
                     </div>
-                    <Button variant="ghost" size="sm" className="text-zinc-400 font-medium hover:text-white" onClick={() => navigate('/')}>
+                    <Button variant="ghost" size="sm" className="text-muted-foreground font-medium hover:text-white" onClick={() => navigate('/')}>
                         Support
                     </Button>
                 </div>
@@ -81,12 +81,12 @@ export default function CandidateStatusTracker() {
                     <div className="space-y-4 relative z-10">
                         <div className="space-y-1">
                             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{application.jobTitle}</h1>
-                            <div className="flex items-center gap-2 text-zinc-500 font-medium">
+                            <div className="flex items-center gap-2 text-muted-foreground font-medium">
                                 <Building2 size={16} />
                                 <span>Enterprise Partner</span>
                             </div>
                         </div>
-                        <div className="flex flex-wrap items-center gap-4 text-xs font-bold uppercase tracking-wider text-zinc-400">
+                        <div className="flex flex-wrap items-center gap-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 rounded-lg border border-white/5">
                                 <Calendar size={14} className="text-indigo-400" />
                                 {new Date(application.appliedAt).toLocaleDateString()}
@@ -102,7 +102,7 @@ export default function CandidateStatusTracker() {
                 {/* Progress Timeline */}
                 <div className="space-y-12">
                     <h2 className="text-xl font-bold flex items-center gap-2">
-                        <FileText size={20} className="text-zinc-500" />
+                        <FileText size={20} className="text-muted-foreground" />
                         Application Timeline
                     </h2>
 
@@ -121,11 +121,11 @@ export default function CandidateStatusTracker() {
                                         {isCompleted ? <CheckCircle2 size={16} /> : <Circle size={16} />}
                                     </div>
                                     <div className="space-y-1">
-                                        <h3 className={`text-lg font-semibold transition-colors ${isCurrent ? 'text-indigo-400' : isCompleted ? 'text-white' : 'text-zinc-500'}`}>
+                                        <h3 className={`text-lg font-semibold transition-colors ${isCurrent ? 'text-indigo-400' : isCompleted ? 'text-white' : 'text-muted-foreground'}`}>
                                             {stage.name}
                                             {isCurrent && <span className="ml-3 text-[10px] font-black uppercase tracking-widest bg-indigo-500 text-white px-2 py-0.5 rounded-full">In Progress</span>}
                                         </h3>
-                                        <p className="text-sm text-zinc-500 font-medium max-w-sm">
+                                        <p className="text-sm text-muted-foreground font-medium max-w-sm">
                                             {stage.description}
                                         </p>
                                     </div>
@@ -136,10 +136,10 @@ export default function CandidateStatusTracker() {
                 </div>
 
                 <div className="mt-20 p-8 rounded-3xl bg-zinc-900/20 border border-white/5 text-center space-y-4">
-                    <p className="text-zinc-400 text-sm font-medium">Keep this tab open or bookmark your magic link to see updates as they happen.</p>
+                    <p className="text-muted-foreground text-sm font-medium">Keep this tab open or bookmark your magic link to see updates as they happen.</p>
                     <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest leading-loose">
                         Your data is secured with Enterprise-grade encryption. <br/>
-                        Managed by Reckuit.ai Sovereignty Layer
+                        Managed by Reckruit.ai Sovereignty Layer
                     </p>
                 </div>
             </main>

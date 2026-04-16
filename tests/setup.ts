@@ -7,7 +7,7 @@ import { getMongoDb, initializeMongoClient } from "../utils/mongoClient";
  */
 beforeAll(async () => {
     process.env.NODE_ENV = "test";
-    process.env.MONGODB_DB_NAME = "reckuit_test";
+    process.env.MONGODB_DB_NAME = "reckruit_test";
     
     // Ensure DB connection is initialized
     await initializeMongoClient();
@@ -21,7 +21,7 @@ beforeAll(async () => {
 afterAll(async () => {
     // Teardown logic if needed (e.g., dropping test database)
     const db = getMongoDb();
-    if (db && process.env.DB_NAME === "reckuit_test") {
+    if (db && process.env.DB_NAME === "reckruit_test") {
         // await db.dropDatabase();
         console.log("[TestSetup] Test database preserved for debugging or cleanup manual.");
     }

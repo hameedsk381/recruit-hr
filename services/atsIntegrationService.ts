@@ -1,4 +1,30 @@
 import { RecruiterAssessmentOutput } from "../types/recruiterCopilot";
+import { GreenhouseConnector } from "./ats/greenhouse";
+import { LeverConnector } from "./ats/lever";
+import { WorkdayConnector } from "./ats/workday";
+import { BambooHRConnector } from "./ats/bamboohr";
+import { ATSConnector } from "./ats/types";
+
+export { GreenhouseConnector, LeverConnector, WorkdayConnector, BambooHRConnector };
+export type { ATSConnector };
+
+/**
+ * Factory to get an ATS connector for a tenant's configured platform.
+ */
+export function getATSConnector(platform: string, credentials: Record<string, string>): ATSConnector {
+  switch (platform.toLowerCase()) {
+    case 'greenhouse':
+      return new GreenhouseConnector(credentials.apiKey);
+    case 'lever':
+      return new LeverConnector(credentials.apiKey);
+    case 'workday':
+      return new WorkdayConnector(credentials.tenantUrl, credentials.accessToken);
+    case 'bamboohr':
+      return new BambooHRConnector(credentials.subdomain, credentials.apiKey);
+    default:
+      throw new Error(`Unsupported ATS platform: ${platform}`);
+  }
+}
 
 /**
  * Universal ATS Integration Service
@@ -27,7 +53,7 @@ export class ATSIntegrationService {
         
         // Construct a structured text block for Zoho's Notes/Comments section
         const structuredNote = `
---- RECRKUIT.AI ASSESSMENT SUMMARY ---
+--- RECKRUIT.AI ASSESSMENT SUMMARY ---
 OVERALL FIT: ${assessment.fit_assessment.overall_fit.toUpperCase()}
 SUMMARY: ${assessment.one_line_summary}
 

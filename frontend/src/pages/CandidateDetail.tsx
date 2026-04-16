@@ -1,15 +1,7 @@
-import { useState, useEffect } from 'react';
+import { } from 'react';
 import { useApp } from '../context/AppContext';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 import api from '../api/client';
 import {
     ArrowLeft,
@@ -17,35 +9,20 @@ import {
     ChevronRight,
     Pin,
     Sparkles,
-    Check,
     AlertCircle,
     Mail,
     Phone,
-    Linkedin,
-    Factory,
-    Microscope,
-    Clipboard,
     Target,
     Mic,
-    Tag,
     ThumbsUp,
-    ThumbsDown,
-    PauseCircle,
-    Briefcase,
-    Info,
-    ChevronsRight,
-    Search,
     Users,
     Clock,
-    Pencil,
-    Trash2,
     ShieldAlert,
     MoreHorizontal,
     Activity,
     Database
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
-import { motion, AnimatePresence } from 'framer-motion';
 
 export default function CandidateDetail() {
     const {
@@ -56,94 +33,17 @@ export default function CandidateDetail() {
         toggleCopilot,
         copilot,
         setView,
-        job,
         batchId,
         updateCandidateStage,
-        removeCandidate
     } = useApp();
 
-    const [notes, setNotes] = useState('');
-    const [notesSaved, setNotesSaved] = useState(false);
-    const [isScheduling, setIsScheduling] = useState(false);
-    const [suggestions, setSuggestions] = useState<any[]>([]);
-    const [loadingSuggestions, setLoadingSuggestions] = useState(false);
-    const [schedulingSuccess, setSchedulingSuccess] = useState(false);
-    const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
-    const [scorecards, setScorecards] = useState<any[]>([]);
-    const [scorecardsLoading, setScorecardsLoading] = useState(false);
-    const [synthesis, setSynthesis] = useState<string | null>(null);
-    const [synthesisLoading, setSynthesisLoading] = useState(false);
 
     const candidate = candidates.find(c => c.id === selectedCandidateId);
     const currentIndex = candidates.findIndex(c => c.id === selectedCandidateId);
     const totalCandidates = candidates.length;
 
-    useEffect(() => {
-        if (selectedCandidateId) {
-            setScorecardsLoading(true);
-            api.getCandidateScorecards(selectedCandidateId)
-                .then(res => {
-                    if (res.success) setScorecards(res.scorecards || []);
-                })
-                .catch(err => console.error('Failed to load scorecards', err))
-                .finally(() => setScorecardsLoading(false));
-        }
-    }, [selectedCandidateId]);
-
-    useEffect(() => {
-        if (candidate?.assessment.recruiter_notes?.notes) {
-            setNotes(candidate.assessment.recruiter_notes.notes);
-        } else {
-            setNotes('');
-        }
-        setNotesSaved(false);
-    }, [selectedCandidateId, candidate]);
-
     const goToPrevious = () => currentIndex > 0 && selectCandidate(candidates[currentIndex - 1].id);
     const goToNext = () => currentIndex < candidates.length - 1 && selectCandidate(candidates[currentIndex + 1].id);
-    const handleSaveNotes = () => { setNotesSaved(true); setTimeout(() => setNotesSaved(false), 3000); };
-
-    const handleOpenScheduling = async () => {
-        setIsScheduling(true);
-        setLoadingSuggestions(true);
-        try {
-            const res = await api.suggestInterviewTimes(candidate?.id || '');
-            if (res.success) setSuggestions(res.suggestions);
-        } finally {
-            setLoadingSuggestions(false);
-        }
-    };
-
-    const handleSchedule = async () => {
-        if (!selectedSlot || !candidate) return;
-        const slot = suggestions.find(s => s.startTime === selectedSlot);
-        if (!slot) return;
-        try {
-            const res = await api.scheduleInterview({
-                candidateId: candidate.id,
-                candidateName: candidate.profile.name,
-                candidateEmail: candidate.profile.email || '',
-                jobId: job?.id || 'current-job',
-                jobTitle: job?.title || 'Engineer',
-                startTime: slot.startTime,
-                type: 'technical',
-                notes: `AI-suggested slot`,
-            });
-            if (res.success) {
-                setSchedulingSuccess(true);
-                setTimeout(() => { setIsScheduling(false); setSchedulingSuccess(false); setView('interviews'); }, 2000);
-            }
-        } catch (err) { console.error(err); }
-    };
-
-    const handleSynthesize = async () => {
-        if (!selectedCandidateId) return;
-        setSynthesisLoading(true);
-        try {
-            const res = await api.synthesizeScorecards(selectedCandidateId);
-            if (res.success) setSynthesis(res.synthesis);
-        } finally { setSynthesisLoading(false); }
-    };
 
     if (!candidate) {
         return (
@@ -431,35 +331,6 @@ export default function CandidateDetail() {
                 </div>
             </main>
 
-            {/* Dialogs */}
-            <Dialog open={isScheduling} onOpenChange={setIsScheduling}>
-                <DialogContent className="rounded-xl border-border/40 shadow-2xl p-0 overflow-hidden max-w-sm bg-card">
-                    <div className="p-8 space-y-6">
-                        <div className="space-y-2 flex flex-col items-center text-center">
-                            <h3 className="text-xl font-bold tracking-tight text-foreground">Technical Loop</h3>
-                            <p className="text-xs text-muted-foreground font-medium">Select an AI-calibrated window for evaluation.</p>
-                        </div>
-                        {loadingSuggestions ? <div className="py-12 flex justify-center"><Loader2 size={24} className="animate-spin text-foreground opacity-50" /></div> : (
-                            <div className="space-y-2">
-                                {suggestions.map(s => (
-                                    <div key={s.startTime} className={cn("p-4 border border-border/60 rounded-md cursor-pointer hover:bg-muted/40 transition-all text-center", selectedSlot === s.startTime && "border-foreground bg-foreground text-background shadow-md")} onClick={() => setSelectedSlot(s.startTime)}>
-                                        <p className="text-sm font-semibold">{new Date(s.startTime).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}</p>
-                                        <p className="text-[10px] opacity-70 font-semibold uppercase tracking-wider mt-0.5">{new Date(s.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                        <div className="flex gap-2.5 pt-2">
-                            <Button variant="outline" className="flex-1 font-semibold rounded-md h-9 border-border/60" onClick={() => setIsScheduling(false)}>Cancel</Button>
-                            <Button className="flex-1 font-semibold rounded-md h-9 shadow-sm" disabled={!selectedSlot} onClick={handleSchedule}>Launch</Button>
-                        </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
         </div>
     );
-}
-
-function Loader2(props: any) {
-    return <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
 }

@@ -1,4 +1,4 @@
-# reckuit.ai — Gap Analysis
+# reckruit.ai — Gap Analysis
 ## Current State vs. Enterprise AI-Native Recruitment Automation OS
 
 **Version:** 1.0  
@@ -10,9 +10,9 @@
 
 ## Executive Summary
 
-reckuit.ai today is a **strong AI-native screening and assessment platform** with best-in-class explainability, compliance foundations, and multi-tenancy. It is **not yet an end-to-end recruitment OS** — it covers roughly **40% of the enterprise hiring lifecycle**, concentrated in the middle of the funnel (screening → shortlisting → interview scheduling).
+reckruit.ai today is a **strong AI-native screening and assessment platform** with best-in-class explainability, compliance foundations, and multi-tenancy. It is **not yet an end-to-end recruitment OS** — it covers roughly **40% of the enterprise hiring lifecycle**, concentrated in the middle of the funnel (screening → shortlisting → interview scheduling).
 
-To become an enterprise production-grade AI-native recruitment automation OS, reckuit.ai must close gaps across three critical dimensions:
+To become an enterprise production-grade AI-native recruitment automation OS, reckruit.ai must close gaps across three critical dimensions:
 
 1. **Lifecycle Coverage** — sourcing (top of funnel), offer management, background verification, and onboarding (bottom of funnel) are missing entirely.
 2. **Enterprise Integrations** — limited ATS coverage (2 platforms), no job boards, no e-signature, no HRIS write-back.
@@ -159,7 +159,7 @@ Phase 4:    ▓▓   ██   ██   ██   ██   ██   ██   █�
 - Re-engagement of previous applicants is manual
 - Referral programs (often 20–40% of enterprise hires) run outside the platform
 
-**Severity:** 🔴 Without sourcing, reckuit.ai is a screening tool, not a recruitment OS. This is the single biggest gap to the "OS" positioning.
+**Severity:** 🔴 Without sourcing, reckruit.ai is a screening tool, not a recruitment OS. This is the single biggest gap to the "OS" positioning.
 
 ---
 
@@ -254,7 +254,7 @@ Phase 4:    ▓▓   ██   ██   ██   ██   ██   ██   █�
 - Real-time webhooks from ATS (stage change events)
 - Employee record creation in HRIS on hire
 - Delta sync (only changed records, not full replays)
-- Field mapping UI (map reckuit fields to custom ATS fields)
+- Field mapping UI (map reckruit fields to custom ATS fields)
 
 **Business impact:**
 - "Sits beside your ATS" positioning requires breadth
@@ -533,7 +533,7 @@ Phase 4:    ▓▓   ██   ██   ██   ██   ██   ██   █�
 
 ### Feature Coverage vs. Enterprise Competitors
 
-| Feature Category | reckuit.ai Today | Greenhouse | Workday | Eightfold.ai | Phenom |
+| Feature Category | reckruit.ai Today | Greenhouse | Workday | Eightfold.ai | Phenom |
 |------------------|:----------------:|:----------:|:-------:|:------------:|:------:|
 | Requisition management | ❌ | ✅ | ✅ | ✅ | ✅ |
 | Sourcing (job boards) | ❌ | ✅ | ✅ | ✅ | ✅ |
@@ -555,14 +555,14 @@ Phase 4:    ▓▓   ██   ██   ██   ██   ██   ██   █�
 | Mobile apps | ❌ | ✅ | ✅ | ✅ | ✅ |
 | Public API & SDK | ❌ | ✅ | ✅ | ✅ | ✅ |
 
-### Where reckuit.ai Leads
+### Where reckruit.ai Leads
 
 - **Explainability** — Evidence-based assessments with strengths, gaps, and interview probes are rare. Most competitors hide scores behind opaque "fit" percentages.
 - **Human-in-the-loop UX** — "Language over numbers" philosophy is differentiated.
 - **Prompt versioning & reproducibility** — Few competitors expose this.
 - **Compliance-first design** — DPDP (India) support is ahead of global competitors.
 
-### Where reckuit.ai Lags
+### Where reckruit.ai Lags
 
 - **Breadth** — 6 stages of 12 are missing (top and bottom of funnel)
 - **Integration ecosystem** — 2 ATS connectors vs. 15+ at competitors
@@ -701,7 +701,7 @@ Phase 4:    ▓▓   ██   ██   ██   ██   ██   ██   █�
 2. 🎯 **Predictive AI suite** (offer acceptance, time-to-fill, retention risk) — leapfrogs traditional ATS competitors
 3. 🎯 **Per-tenant fine-tune loop** — compounding AI advantage that competitors cannot easily replicate
 
-**Biggest existential risk:** Without sourcing (Phase 2), reckuit.ai will be perceived and positioned as a screening add-on, not a core system of record. Enterprise buyers will keep their ATS as the source of truth, limiting reckuit.ai to a tactical tool with low strategic stickiness.
+**Biggest existential risk:** Without sourcing (Phase 2), reckruit.ai will be perceived and positioned as a screening add-on, not a core system of record. Enterprise buyers will keep their ATS as the source of truth, limiting reckruit.ai to a tactical tool with low strategic stickiness.
 
 ---
 

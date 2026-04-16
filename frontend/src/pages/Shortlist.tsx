@@ -25,19 +25,14 @@ import {
     Upload,
     Filter,
     Pin,
-    RotateCcw,
     Users,
-    Sparkles,
-    AlertCircle,
-    Check,
     Search,
     ChevronRight,
     Brain,
-    Trophy,
     Trash2,
-    Target,
     Activity,
-    Database
+    Database,
+    Calendar
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
@@ -53,11 +48,12 @@ export default function Shortlist() {
         selectCandidate,
         pinCandidate,
         removeCandidate,
-        restoreCandidate,
         toggleCopilot,
         copilot,
         batchId,
-        setBatchId
+        setBatchId,
+        addInterview,
+        setView
     } = useApp();
 
     const [removeModalId, setRemoveModalId] = useState<string | null>(null);
@@ -116,7 +112,7 @@ export default function Shortlist() {
                         setUploadProgress(null);
                         setCandidatesLoading(false);
                     } else if (status.status === 'FAILED') {
-                        setError('candidates', 'Batch processing failed on our sovereign cluster.');
+                        setError('candidates', 'Candidate processing failed. Please try again.');
                         isCompleted = true;
                         setCandidatesLoading(false);
                     } else if (status.status === 'CANCELLED') {
@@ -133,7 +129,7 @@ export default function Shortlist() {
             }
         } catch (err) {
             console.error('Polling failed', err);
-            setError('candidates', 'Connection lost while polling sovereign cluster.');
+            setError('candidates', 'Connection lost while processing.');
         } finally {
             setCandidatesLoading(false);
             setUploadProgress(null);
@@ -242,8 +238,8 @@ export default function Shortlist() {
                     <div className="flex flex-col items-center justify-center text-center space-y-4">
                         <div className="size-10 border-2 border-foreground border-t-transparent rounded-full animate-spin opacity-50" />
                         <div className="space-y-1">
-                            <h2 className="text-xl font-bold tracking-tight text-foreground">Synthesizing Results</h2>
-                            <p className="text-sm text-muted-foreground animate-pulse">Decomposing experience vectors and skill density...</p>
+                            <h2 className="text-xl font-bold tracking-tight text-foreground">Analyzing Candidates</h2>
+                            <p className="text-sm text-muted-foreground animate-pulse">Scanning experience and technical matches...</p>
                         </div>
                     </div>
                     
@@ -320,13 +316,13 @@ export default function Shortlist() {
                                 <SelectContent>
                                     <SelectItem value="rank">AI Recommended</SelectItem>
                                     <SelectItem value="name">Alphabetical</SelectItem>
-                                    <SelectItem value="fit">Competency Fit</SelectItem>
+                                    <SelectItem value="fit">Overall Match</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
                         
                         <div className="space-y-3 pt-2">
-                            <label className="text-xs font-medium text-foreground mb-1 block">Fit Potential</label>
+                            <label className="text-xs font-medium text-foreground mb-1 block">Match Level</label>
                             {['high', 'medium', 'low'].map((level) => (
                                 <div key={level} className="flex items-center justify-between group cursor-pointer hover:bg-muted/50 p-1.5 -mx-1.5 rounded-md transition-colors" onClick={() => {
                                     if (filters.fitLevel.includes(level)) {
@@ -458,7 +454,7 @@ export default function Shortlist() {
                                    <Search size={32} className="text-muted-foreground/50 mb-4" />
                                    <h3 className="text-lg font-semibold text-foreground">No matches found</h3>
                                    <p className="text-sm text-muted-foreground mt-1">Try adjusting your filters or upload more resumes.</p>
-                                   <Button variant="outline" size="sm" className="mt-6 font-medium" onClick={() => { setFilters({ fitLevel: [], showRemoved: false }); setSortBy('rank'); }}>
+                                   <Button variant="outline" size="sm" className="mt-6 font-medium" onClick={() => { setFilters({ fitLevel: [], stages: [], showRemoved: false }); setSortBy('rank'); }}>
                                        Clear Filters
                                    </Button>
                                 </motion.div>

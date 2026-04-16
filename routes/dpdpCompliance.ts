@@ -12,11 +12,10 @@ export async function getDpdpNoticeHandler(req: Request): Promise<Response> {
         version: "2026.1",
         primary_language: "en",
         supported_languages: ["en", "hi", "te", "ta", "mr", "bn", "gu"], // Indic languages (Schedule VIII)
-        data_fiduciary: {
-            name: "Recrkuit.ai Operations India Pvt Ltd",
+data_fiduciary: {
+            name: "Reckruit.ai Operations India Pvt Ltd",
             grievance_officer: {
-                name: "Compliance Director",
-                email: "grievance@recrkuit.ai",
+                email: "grievance@reckruit.ai",
                 contact_timeline: "Acknowledged within 24 hours, resolved within 30 days."
             }
         },

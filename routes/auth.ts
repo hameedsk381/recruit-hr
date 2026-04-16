@@ -26,7 +26,7 @@ export async function loginHandler(req: Request): Promise<Response> {
         let user = await usersDb.findOne({ email, tenantId });
 
         // Auto-provision default admins if they don't exist yet (for demo/development convenience)
-        if (!user && (email === 'admin@docapture.com' || email === 'admin@talentacquisition.ai')) {
+        if (!user && (email === 'admin@docapture.com' || email === 'admin@reckruit.ai')) {
             const hashedPassword = await bcrypt.hash(password, 10);
             const newUser = {
                 email,

@@ -3,17 +3,13 @@ import { useApp } from '../context/AppContext';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-    Users, 
-    CheckCircle2, 
-    XCircle, 
-    MessageSquare, 
-    ChevronRight,
-    Sparkles,
+import {
+    Users,
+    CheckCircle2,
+    XCircle,
+    MessageSquare,
     Target,
     Activity,
-    Brain,
-    Trophy,
     AlertCircle,
     ThumbsUp
 } from 'lucide-react';
@@ -26,7 +22,6 @@ export default function HMDashboard() {
         candidates, 
         candidatesLoading, 
         submitHMDecision,
-        user 
     } = useApp();
 
     const [selectedId, setSelectedId] = useState<string | null>(null);
