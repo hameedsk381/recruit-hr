@@ -5,6 +5,9 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import CandidatePortal from './pages/CandidatePortal';
 import DashboardLayout from './layouts/DashboardLayout';
+import PublicCareerPortal from './pages/PublicCareerPortal';
+import JobApplicationFlow from './pages/JobApplicationFlow';
+import CandidateStatusTracker from './pages/CandidateStatusTracker';
 
 
 /**
@@ -26,6 +29,11 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/portal/:id" element={<CandidatePortal />} />
+          
+          {/* Phase 4: Candidate Experience & Portal */}
+          <Route path="/jobs/:tenantId" element={<PublicCareerPortal />} />
+          <Route path="/jobs/:tenantId/:jobId/apply" element={<JobApplicationFlow />} />
+          <Route path="/status/:token" element={<CandidateStatusTracker />} />
 
           {/* Protected App Routes */}
           <Route path="/app/*" element={<DashboardLayout />} />

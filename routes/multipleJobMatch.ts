@@ -4,9 +4,11 @@ import { downloadMultipleFiles, validateUrls } from '../utils/fileDownloader';
 import { JobDescriptionData } from '../services/jdExtractor';
 import { initializeRequestContext } from '../utils/requestContext';
 
-export async function multipleJobMatchHandler(req: Request): Promise<Response> {
+import { AuthContext } from '../middleware/authMiddleware';
+
+export async function multipleJobMatchHandler(req: Request, context: AuthContext): Promise<Response> {
   // Initialize request context with Tenant ID and Request ID
-  const { requestId, tenantId, logger } = initializeRequestContext(req, 'MultipleJobMatchHandler');
+  const { requestId, tenantId, logger } = initializeRequestContext(req, 'MultipleJobMatchHandler', context.tenantId, context.userId);
 
   try {
     logger.info('Received multiple job match request', { tenantId });
@@ -23,10 +25,17 @@ export async function multipleJobMatchHandler(req: Request): Promise<Response> {
       // Handle URL-based or Data-based input
       logger.info('Processing JSON input');
 
-      const body = await req.json();
-      const jdUrlsArray = body.job_description_urls || body.jdUrls || [];
+      let body: any;
+      try {
+        body = await req.json();
+      } catch (err) {
+        logger.error('Failed to parse JSON body', err as Error);
+        return new Response(JSON.stringify({ success: false, error: 'Invalid JSON body' }), { status: 400 });
+      }
+
+      const jdUrlsArray = body.job_description_urls || body.jd_urls || body.jdUrls || [];
       const resumeUrlsArray = body.resume_urls || body.resumeUrls || [];
-      const jdData = body.job_description_data || body.jdData;
+      const jdData = body.job_description_data || body.jd_data || body.jdData;
 
       // Store JDs from data
       if (jdData) {
@@ -131,23 +140,26 @@ export async function multipleJobMatchHandler(req: Request): Promise<Response> {
         }
       }
 
-    } else {
-      // Handle FormData file uploads (original behavior)
-      logger.info('Processing FormData file uploads');
+      let formData: FormData;
+      try {
+        formData = await req.formData();
+      } catch (err) {
+        logger.error('Failed to parse FormData', err as Error);
+        return new Response(JSON.stringify({ success: false, error: 'Invalid FormData' }), { status: 400 });
+      }
 
-      const formData = await req.formData();
+      // Get all JD files (support multiple keys for consistency)
+      const jdItems = [
+        ...formData.getAll('job_descriptions'),
+        ...formData.getAll('job_description'),
+        ...formData.getAll('jd')
+      ].filter(item => item instanceof File) as File[];
 
-      // Get all JD files
-      const jdItems = formData.getAll('job_descriptions');
       logger.debug('Processing job description files', { count: jdItems.length });
 
       jdItems.forEach((item, index) => {
-        if (item instanceof File) {
-          logger.debug('JD file received', { index, fileName: item.name, size: item.size });
-          jdFiles.push(item);
-        } else {
-          logger.warn('Invalid JD item type', { index, type: typeof item });
-        }
+        logger.debug('JD file received', { index, fileName: item.name, size: item.size });
+        jdFiles.push(item);
       });
 
       // Get JD Data from FormData

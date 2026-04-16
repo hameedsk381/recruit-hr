@@ -67,17 +67,20 @@ export async function getBatchStatusHandler(req: Request, context: any): Promise
         const db = getMongoDb();
         if (!db) return new Response(JSON.stringify({ error: "DB Unavailable" }), { status: 503 });
 
-        const ticket = await db.collection('batch_tickets').findOne({ _id: new ObjectId(batchId) });
+        const ticket = await db.collection('batch_tickets').findOne({ 
+            _id: new ObjectId(batchId),
+            tenantId: context.tenantId
+        });
         
         if (!ticket) {
-            return new Response(JSON.stringify({ success: false, error: "Batch not found" }), { status: 404 });
+            return new Response(JSON.stringify({ success: false, error: "Batch not found or access denied" }), { status: 404 });
         }
 
         // Determine if it's finished based on counts
         const isComplete = (ticket.processedCount >= ticket.totalCount);
         if (isComplete && ticket.status !== 'COMPLETE') {
             await db.collection('batch_tickets').updateOne(
-                { _id: new ObjectId(batchId) },
+                { _id: new ObjectId(batchId), tenantId: context.tenantId },
                 { $set: { status: 'COMPLETE', completedAt: new Date() } }
             );
             ticket.status = 'COMPLETE';

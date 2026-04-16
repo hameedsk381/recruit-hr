@@ -38,7 +38,7 @@ export class InterviewService {
 
             // Update the record with calendar info
             await db.collection(COLLECTION_NAME).updateOne(
-                { id: newInterview.id },
+                { id: newInterview.id, tenantId: newInterview.tenantId },
                 {
                     $set: {
                         calendarEventId: newInterview.calendarEventId,
@@ -156,7 +156,7 @@ export class InterviewService {
             try {
                 await EmailService.sendInterviewReminder(interview);
                 await db.collection(COLLECTION_NAME).updateOne(
-                    { id: interview.id },
+                    { id: interview.id, tenantId: interview.tenantId },
                     { $set: { reminderSent: true } }
                 );
             } catch (error) {

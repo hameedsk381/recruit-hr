@@ -29,8 +29,8 @@ export async function hybridChatCompletion(
     enforceSovereignty = true,
     targetProvider,
     targetModel,
-    fallbackCloudModel = 'groq/llama-3.1-8b-instant',
-    fallbackLocalModel = 'ollama/llama3', 
+    fallbackCloudModel = 'groq-fast',
+    fallbackLocalModel = 'local-sovereign', 
     temperature = 0.3,
     max_tokens = 2048
   } = options;

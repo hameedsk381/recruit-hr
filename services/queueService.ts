@@ -39,7 +39,7 @@ export const assessmentWorker = new Worker(
         const logger = createLogger(job.id || 'unknown-job', 'AssessmentWorker', tenantId, userId);
         try {
             if (batchId) {
-                const isCancelled = await BatchService.isBatchCancelled(batchId);
+                const isCancelled = await BatchService.isBatchCancelled(batchId, tenantId);
                 if (isCancelled) {
                     logger.info(`Skipping job ${job.id} as batch ${batchId} was cancelled.`);
                     return { resumeName, status: 'CANCELLED' };
@@ -68,7 +68,7 @@ export const assessmentWorker = new Worker(
 
             // If part of a batch, update DB progress
             if (batchId) {
-                await BatchService.updateJobProgress(batchId, result, true);
+                await BatchService.updateJobProgress(batchId, tenantId, result, true);
             }
 
             return result;
@@ -76,7 +76,7 @@ export const assessmentWorker = new Worker(
             const err = error instanceof Error ? error : new Error(String(error));
             logger.error(`Assessment failed for ${resumeName}`, err);
             if (batchId) {
-                await BatchService.updateJobProgress(batchId, null, false);
+                await BatchService.updateJobProgress(batchId, tenantId, null, false);
             }
             throw err;
         }

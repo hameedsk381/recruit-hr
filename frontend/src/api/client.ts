@@ -306,9 +306,33 @@ export const api = {
         return request<{ success: boolean; questions: any[] }>('/generate-mcq', {
             method: 'POST',
             body: {
-                jobDescription: typeof jdData === 'string' ? jdData : JSON.stringify(jdData),
                 resume: resumeData ? (typeof resumeData === 'string' ? resumeData : JSON.stringify(resumeData)) : undefined
             }
+        });
+    },
+
+    // Phase 4: Public Candidate Portal
+    getPublicJobs: async (tenantId: string) => {
+        return request<{ success: boolean; jobs: any[] }>(`/public/jobs?tenantId=${tenantId}`);
+    },
+
+    publicApply: async (formData: FormData) => {
+        const response = await fetch(`${API_BASE_URL}/public/apply`, {
+            method: 'POST',
+            body: formData,
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+    },
+
+    getApplicationStatus: async (token: string) => {
+        return request<{ success: boolean; application: any }>(`/public/track?token=${token}`);
+    },
+
+    candidateChat: async (message: string, token: string) => {
+        return request<{ success: boolean; response: string; isFinished: boolean }>('/public/chat', {
+            method: 'POST',
+            body: { message, token }
         });
     }
 };

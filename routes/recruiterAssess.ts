@@ -34,8 +34,10 @@ const corsHeaders = {
  * FormData with 'jd' (PDF) and 'resume' (PDF) files
  * OR 'jdUrl' and 'resumeUrl' fields with URLs to PDFs
  */
-export async function recruiterAssessHandler(req: Request): Promise<Response> {
-    console.log("[RecruiterAssess] Received assessment request");
+export async function recruiterAssessHandler(req: Request, context: AuthContext): Promise<Response> {
+    const tenantId = context?.tenantId || "unknown";
+    const userId = context?.userId || "unknown";
+    console.log(`[RecruiterAssess] Received assessment request for tenant: ${tenantId}, user: ${userId}`);
 
     try {
         const contentType = req.headers.get("content-type") || "";
@@ -209,8 +211,10 @@ export async function recruiterAssessHandler(req: Request): Promise<Response> {
  *   ]
  * }
  */
-export async function recruiterBatchAssessHandler(req: Request): Promise<Response> {
-    console.log("[RecruiterAssess] Received batch assessment request");
+export async function recruiterBatchAssessHandler(req: Request, context: AuthContext): Promise<Response> {
+    const tenantId = context?.tenantId || "unknown";
+    const userId = context?.userId || "unknown";
+    console.log(`[RecruiterAssess] Received batch assessment request for tenant: ${tenantId}, user: ${userId}`);
 
     try {
         const body = await req.json();

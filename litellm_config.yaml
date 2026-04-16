@@ -5,5 +5,5 @@ model_list:
 
   - model_name: local-sovereign
     litellm_params:
-      model: ollama/llama3
-      api_base: http://host.docker.internal:11434 # Use host.docker.internal to reach Ollama on the host machine Windows
+      model: ollama/llama3:latest
+      api_base: http://host.docker.internal:11434

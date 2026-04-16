@@ -1,3 +1,4 @@
+import { hasRole, hasPermission, Role } from '../utils/permissions';
 import { initializeRequestContext } from '../utils/requestContext';
 import { AuditService } from '../services/auditService';
 import { verifyToken } from '../utils/auth';
@@ -8,6 +9,11 @@ export interface AuthContext {
     userId: string;
     email: string;
     roles: string[];
+}
+
+interface AuthOptions {
+    requiredRoles?: Role[];
+    requiredPermission?: string;
 }
 
 /**
@@ -64,10 +70,11 @@ export async function validateRequestAuth(req: Request): Promise<{
 }
 
 /**
- * Higher-order function to wrap route handlers with Auth & Audit
+ * Higher-order function to wrap route handlers with Auth, RBAC & Audit
  */
 export function withAuth(
-    handler: (req: Request, context: AuthContext) => Promise<Response>
+    handler: (req: Request, context: AuthContext) => Promise<Response>,
+    options?: AuthOptions
 ): (req: Request) => Promise<Response> {
     return async (req: Request) => {
         const { requestId } = initializeRequestContext(req, handler.name);
@@ -88,6 +95,21 @@ export function withAuth(
         }
 
         const context = authResult.context!;
+
+        // RBAC Enforcement
+        if (options?.requiredRoles && !hasRole(context, options.requiredRoles)) {
+            return new Response(JSON.stringify({
+                success: false,
+                error: "Insufficient roles to access this resource."
+            }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        if (options?.requiredPermission && !hasPermission(context, options.requiredPermission)) {
+            return new Response(JSON.stringify({
+                success: false,
+                error: "Access denied. Required permission missing."
+            }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+        }
 
         AuditService.getInstance().log({
             tenantId: context.tenantId,
