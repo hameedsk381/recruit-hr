@@ -54,6 +54,10 @@ import { ssoInitHandler, ssoCallbackHandler } from "./routes/sso";
 import { rateLimitMiddleware } from "./middleware/rateLimiter";
 import { ROLES } from "./utils/permissions";
 import { initializeWorkflow } from "./services/workflowService";
+import { auditMiddleware } from "./middleware/auditMiddleware";
+import { resolveAllowedOrigin, applyCorsHeaders, buildCorsHeaders } from "./middleware/corsMiddleware";
+import { addSecurityHeaders } from "./middleware/securityHeaders";
+import { verifyWebhookSignature, reconstructRequest } from "./middleware/webhookAuth";
 
 // Phase 1 — v1 routes
 import { healthHandler, readyHandler, metricsHandler } from "./routes/health";
@@ -80,7 +84,7 @@ import {
 } from "./routes/v1/jobPostings";
 import {
   searchTalentPoolHandler, addToTalentPoolHandler, getTalentProfileHandler,
-  updateTalentProfileHandler, enrollNurtureHandler, bulkImportHandler
+  updateTalentProfileHandler, enrollNurtureHandler, bulkImportHandler, semanticSearchHandler
 } from "./routes/v1/talentPool";
 import {
   submitReferralHandler, listReferralsHandler, updateReferralStatusHandler, payReferralBonusHandler
@@ -102,6 +106,17 @@ import {
 import {
   initiateBGVHandler, getBGVHandler, bgvWebhookHandler, decideBGVHandler
 } from "./routes/v1/bgv";
+import {
+  listWorkflowsHandler, createWorkflowHandler, updateWorkflowHandler, deleteWorkflowHandler
+} from "./routes/v1/workflows";
+import { generateReportHandler } from "./routes/v1/reports";
+import {
+  initiateOnboardingHandler, listOnboardingHandler, updateOnboardingTaskHandler
+} from "./routes/v1/onboarding";
+import { getEeoReportHandler, deleteCandidateGdprHandler } from "./routes/v1/compliance";
+import { SequenceEngine } from "./services/nurture/sequenceEngine";
+import { JobBoardService } from "./services/jobBoardService";
+
 
 // Load environment variables
 config();
@@ -110,17 +125,51 @@ import { listAPIKeysHandler, createAPIKeyHandler, revokeAPIKeyHandler } from "./
 
 const PORT = Number(process.env.HR_TOOLS_PORT) || 3001;
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, x-tenant-id",
-};
 
 // Simple request logging
 function logRequest(req: Request, startTime: number, status: number) {
   const duration = Date.now() - startTime;
   const url = new URL(req.url);
   console.log(`[${new Date().toISOString()}] ${req.method} ${url.pathname} ${status} ${duration}ms`);
+}
+
+/**
+ * Returns a 413 Response if Content-Length exceeds the allowed limit, otherwise null.
+ * File-upload endpoints allow 10 MB; all others allow 1 MB.
+ */
+function checkRequestSize(req: Request, normalizedPath: string): Response | null {
+  if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") return null;
+
+  const contentLength = parseInt(req.headers.get("content-length") || "0", 10);
+  if (!contentLength) return null;
+
+  const FILE_UPLOAD_PATHS = [
+    "/extract-resume",
+    "/extract-jd",
+    "/extract-jd-new",
+    "/extract-jd-streaming",
+    "/knowledge/ingest",
+  ];
+
+  const isFileUpload = FILE_UPLOAD_PATHS.includes(normalizedPath);
+  const maxBytes = isFileUpload ? 10 * 1024 * 1024 : 1 * 1024 * 1024;
+
+  if (contentLength > maxBytes) {
+    const limit = isFileUpload ? "10MB" : "1MB";
+    return Response.json(
+      {
+        success: false,
+        error: {
+          code: "PAYLOAD_TOO_LARGE",
+          message: `Request body exceeds the ${limit} limit for this endpoint.`,
+          requestId: crypto.randomUUID(),
+        },
+      },
+      { status: 413 }
+    );
+  }
+
+  return null;
 }
 
 // Initialize Infrastructure in Sequence
@@ -147,605 +196,696 @@ async function startServer() {
 
         // 1. Rate Limiting
         const rateLimitResponse = await rateLimitMiddleware(req, ip);
-        if (rateLimitResponse) {
-            logRequest(req, startTime, rateLimitResponse.status);
-            return rateLimitResponse;
-        }
+        // We define addCors and addVersionHeaders earlier to use them here if needed,
+        // but finalHandler is defined later. Let's move them up.
 
-        // Helper for CORS
-        const addCors = (res: Response) => {
-          const newHeaders = new Headers(res.headers);
-          Object.entries(corsHeaders).forEach(([k, v]) => newHeaders.set(k, v));
-          return new Response(res.body, {
-            status: res.status,
-            statusText: res.statusText,
-            headers: newHeaders,
-          });
-        };
 
         if (req.method === "OPTIONS") {
+          const origin = req.headers.get("origin");
+          const allowedOrigin = await resolveAllowedOrigin(origin);
+          const headers = buildCorsHeaders(allowedOrigin);
           logRequest(req, startTime, 204);
-          return new Response(null, { status: 204, headers: corsHeaders });
+          return new Response(null, { status: 204, headers });
         }
 
-        // Phase 1 & 2: Unversioned health + public webhook endpoints
-        if (url.pathname === "/ready")   return addCors(await readyHandler(req));
-        if (url.pathname === "/metrics") return addCors(await metricsHandler(req));
-        if (req.method === "POST" && url.pathname === "/webhooks/esign") return addCors(await esignWebhookHandler(req));
-        if (req.method === "POST" && url.pathname === "/webhooks/bgv")   return addCors(await bgvWebhookHandler(req));
-        if (req.method === "POST" && url.pathname === "/webhooks/outreach/tracking") return addCors(await outreachTrackingWebhook(req));
-        if (req.method === "POST" && url.pathname === "/webhooks/video") return addCors(await videoWebhookHandler(req));
+        // Request size guard (before body is read)
+        const sizeError = checkRequestSize(req, url.pathname.startsWith("/v1/") ? url.pathname.slice(3) : url.pathname);
+        if (sizeError) {
+          logRequest(req, startTime, 413);
+          return sizeError;
+        }
 
-        // Public Routes
+        // Phase 1: API Versioning Support
+        const isVersioned = url.pathname.startsWith("/v1/");
+        const normalizedPath = isVersioned ? url.pathname.slice(3) : url.pathname;
+        
         const PUBLIC_ROUTES = [
           "/", "/health", "/ready", "/metrics", "/mongo-info", "/auth/login", "/auth/register",
-          "/auth/sso/init", "/auth/sso/callback", "/public/jobs",
+          "/auth/sso/init", "/auth/sso/callback",
           "/public/apply", "/public/track", "/public/chat",
-          "/webhooks/esign", "/webhooks/bgv", "/v1/bgv/webhook",
-          "/webhooks/outreach/tracking",
+          "/webhooks/esign", "/webhooks/bgv",
+          "/webhooks/outreach",
           "/webhooks/video",
         ];
 
-        // Auth Context
+        // 🟢 Method-Aware Public Check 🟢
+        const isPublicRequest = PUBLIC_ROUTES.includes(normalizedPath) || (req.method === "GET" && normalizedPath === "/public/jobs");
+
+        // 🟢 Centralized Response Wrapper 🟢
+        const requestOrigin = req.headers.get("origin");
+        const allowedOrigin = await resolveAllowedOrigin(requestOrigin, context?.tenantId);
+        const addCors = (res: Response) => applyCorsHeaders(res, allowedOrigin);
+
+        const addVersionHeaders = (res: Response) => {
+          const newHeaders = new Headers(res.headers);
+          if (!isVersioned && normalizedPath !== "/") {
+            newHeaders.set("Deprecation", "true");
+            newHeaders.set("Link", `<${url.origin}/v1${normalizedPath}>; rel="alternate"`);
+          }
+          newHeaders.set("X-API-Version", "v1.0.0");
+          return new Response(res.body, { status: res.status, statusText: res.statusText, headers: newHeaders });
+        };
+
+        const finalHandler = async (res: Response) => {
+          const finishedRes = addSecurityHeaders(addVersionHeaders(addCors(res)));
+          if (context) {
+            // Background audit logging
+            auditMiddleware(req, context, finishedRes.status).catch(e => console.error('[Audit] Logging error:', e));
+          }
+          return finishedRes;
+        };
+
+        // 1. Rate Limiting (re-applied with headers)
+        if (rateLimitResponse) {
+            logRequest(req, startTime, rateLimitResponse.status);
+            return finalHandler(rateLimitResponse);
+        }
+
+        // 2. Auth Context
         let context: any = null;
-        if (!PUBLIC_ROUTES.includes(url.pathname)) {
+        if (!isPublicRequest) {
           const authResult = await validateRequestAuth(req);
           if (!authResult.valid) {
             logRequest(req, startTime, 401);
-            return addCors(authResult.response!);
+            return finalHandler(authResult.response!);
           }
           context = authResult.context;
         }
 
         try {
+          // Phase 1 & 2: Infrastructure Endpoints
+          if (normalizedPath === "/ready")   return finalHandler(await readyHandler(req));
+          if (normalizedPath === "/metrics") return finalHandler(await metricsHandler(req));
+
           // ROUTE HANDLERS
-          if (req.method === "POST" && url.pathname === "/auth/login") {
-            const response = await loginHandler(req);
-            logRequest(req, startTime, response.status);
-            return addCors(response);
-          }
-
-          if (req.method === "GET" && (url.pathname === "/health" || url.pathname === "/v1/health")) {
-            const response = await healthHandler(req);
-            logRequest(req, startTime, response.status);
-            return addCors(response);
-          }
-
-          if (req.method === "POST" && url.pathname === "/auth/register") {
+          if (req.method === "POST" && normalizedPath === "/auth/register") {
             const response = await registerHandler(req);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "GET" && url.pathname === "/auth/sso/init") {
+          if (req.method === "GET" && normalizedPath === "/auth/sso/init") {
             const response = await ssoInitHandler(req);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/auth/sso/callback") {
+          if (req.method === "POST" && normalizedPath === "/auth/login") {
+            const response = await loginHandler(req);
+            logRequest(req, startTime, response.status);
+            return finalHandler(response);
+          }
+
+          if (req.method === "GET" && normalizedPath === "/health") {
+            const response = await healthHandler(req);
+            logRequest(req, startTime, response.status);
+            return finalHandler(response);
+          }
+
+          if (req.method === "POST" && normalizedPath === "/auth/sso/callback") {
             const response = await ssoCallbackHandler(req);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/extract-resume") {
-            const response = await resumeExtractHandler(req);
+          if (req.method === "POST" && normalizedPath === "/extract-resume") {
+            const response = await resumeExtractHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/extract-jd") {
+          if (req.method === "POST" && normalizedPath === "/extract-jd") {
             const response = await jdExtractHandler(req);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/extract-jd-new") {
+          if (req.method === "POST" && normalizedPath === "/extract-jd-new") {
             const response = await jdExtractorNewHandler(req);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/extract-jd-streaming") {
+          if (req.method === "POST" && normalizedPath === "/extract-jd-streaming") {
             const response = await jdExtractorStreamingHandler(req);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/validate-jd") {
+          if (req.method === "POST" && normalizedPath === "/validate-jd") {
             const response = await jdValidateHandler(req);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/generate-mcq") {
-            const response = await mcqGenerateHandler(req);
+          if (req.method === "POST" && normalizedPath === "/generate-mcq") {
+            const response = await mcqGenerateHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/generate-voice-questions") {
+          if (req.method === "POST" && normalizedPath === "/generate-voice-questions") {
             const response = await voiceInterviewHandler(req);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/copilot/chat") {
+          if (req.method === "POST" && normalizedPath === "/copilot/chat") {
             const response = await copilotChatHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/match") {
+          if (req.method === "POST" && normalizedPath === "/match") {
             const response = await jobMatchHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/match-multiple") {
+          if (req.method === "POST" && normalizedPath === "/match-multiple") {
             const response = await multipleJobMatchHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/cancel-batch") {
+          if (req.method === "POST" && normalizedPath === "/cancel-batch") {
             const response = await cancelBatchHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "GET" && url.pathname === "/job-status") {
+          if (req.method === "GET" && normalizedPath === "/job-status") {
             const response = await jobStatusHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/evaluate") {
+          if (req.method === "POST" && normalizedPath === "/evaluate") {
             const response = await answerEvaluateHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/evaluate-audio") {
+          if (req.method === "POST" && normalizedPath === "/evaluate-audio") {
             const response = await audioEvaluateHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/query-mongo") {
+          if (req.method === "POST" && normalizedPath === "/query-mongo") {
             const response = await mongoNLQueryHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "GET" && url.pathname === "/mongo-info") {
+          if (req.method === "GET" && normalizedPath === "/mongo-info") {
             const response = await mongoDatabaseInfoHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "GET" && url.pathname === "/analytics") {
+          if (req.method === "GET" && normalizedPath === "/analytics") {
             const response = await analyticsHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "GET" && url.pathname === "/analytics/roi") {
+          if (req.method === "GET" && normalizedPath === "/analytics/roi") {
             const response = await getRoiAnalyticsHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/assess-candidate") {
+          if (req.method === "POST" && normalizedPath === "/assess-candidate") {
             const response = await recruiterAssessHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/assess-batch") {
+          if (req.method === "POST" && normalizedPath === "/assess-batch") {
             const response = await recruiterBatchAssessHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "GET" && url.pathname === "/interviews") {
+          if (req.method === "GET" && normalizedPath === "/interviews") {
             const response = await listInterviewsHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/interviews/schedule") {
+          if (req.method === "POST" && normalizedPath === "/interviews/schedule") {
             const response = await scheduleInterviewHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "GET" && url.pathname === "/interviews/suggest-times") {
+          if (req.method === "GET" && normalizedPath === "/interviews/suggest-times") {
             const response = await suggestTimesHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/interviews/cancel") {
+          if (req.method === "POST" && normalizedPath === "/interviews/cancel") {
             const response = await cancelInterviewHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/interviews/reschedule") {
+          if (req.method === "POST" && normalizedPath === "/interviews/reschedule") {
             const response = await rescheduleInterviewHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "GET" && url.pathname === "/calendar/status") {
+          if (req.method === "GET" && normalizedPath === "/calendar/status") {
             const response = await getCalendarStatusHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/calendar/connect") {
+          if (req.method === "POST" && normalizedPath === "/calendar/connect") {
             const response = await connectCalendarHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/scorecards/submit") {
+          if (req.method === "POST" && normalizedPath === "/scorecards/submit") {
             const response = await submitScorecardHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "GET" && url.pathname === "/scorecards/candidate") {
+          if (req.method === "GET" && normalizedPath === "/scorecards/candidate") {
             const response = await getCandidateScorecardsHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "GET" && url.pathname === "/scorecards/synthesis") {
+          if (req.method === "GET" && normalizedPath === "/scorecards/synthesis") {
             const response = await synthesizeScorecardsHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/batch/upload") {
+          if (req.method === "POST" && normalizedPath === "/batch/upload") {
             const response = await bulkProcessUploadHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "GET" && url.pathname.startsWith("/batch/status/")) {
+          if (req.method === "GET" && normalizedPath.startsWith("/batch/status/")) {
             const response = await getBatchStatusHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/ats/sync") {
+          if (req.method === "POST" && normalizedPath === "/ats/sync") {
             const response = await atsSyncHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "GET" && url.pathname === "/recruiter/active-state") {
+          if (req.method === "GET" && normalizedPath === "/recruiter/active-state") {
             const response = await getActiveStateHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "GET" && url.pathname === "/recruiter/history") {
+          if (req.method === "GET" && normalizedPath === "/recruiter/history") {
             const response = await getRecruiterHistoryHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/recruiter/update-candidate") {
+          if (req.method === "POST" && normalizedPath === "/recruiter/update-candidate") {
             const response = await updateCandidateHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "GET" && url.pathname === "/tenant/settings") {
+          if (req.method === "GET" && normalizedPath === "/tenant/settings") {
             const response = await getTenantSettingsHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/tenant/settings") {
+          if (req.method === "POST" && normalizedPath === "/tenant/settings") {
             const response = await updateTenantSettingsHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "PATCH" && url.pathname === "/v1/settings/blind-screening") {
+          if (req.method === "PATCH" && normalizedPath === "/settings/blind-screening") {
             const response = await updateBlindScreeningHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "GET" && url.pathname === "/public/jobs") {
+          if (req.method === "GET" && normalizedPath === "/public/jobs") {
             const response = await getPublicJobsHandler(req);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/public/jobs/publish") {
+          if (req.method === "POST" && normalizedPath === "/public/jobs/publish") {
             const response = await publishJobHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/public/apply") {
+          if (req.method === "POST" && normalizedPath === "/public/apply") {
             const response = await publicApplyHandler(req);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
-
-          if (req.method === "GET" && url.pathname === "/public/track") {
+          if (req.method === "GET" && (normalizedPath === "/public/track" || normalizedPath === "/getApplicationStatus")) {
             const response = await getApplicationStatusHandler(req);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/public/chat") {
+
+          if (req.method === "POST" && normalizedPath === "/public/chat") {
             const response = await candidateChatHandler(req);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "DELETE" && url.pathname.startsWith("/privacy/candidate/")) {
+          if (req.method === "DELETE" && normalizedPath.startsWith("/privacy/candidate/")) {
             const response = await deleteCandidateGdprHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/privacy/retention-cron") {
+          if (req.method === "POST" && normalizedPath === "/privacy/retention-cron") {
             if (!context.roles.includes(ROLES.ADMIN)) {
-              return addCors(new Response(JSON.stringify({ error: "Unauthorized" }), { status: 403 }));
+              return finalHandler(new Response(JSON.stringify({ error: "Unauthorized" }), { status: 403 }));
             }
             const response = await runRetentionPolicyHandler(req, context);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "GET" && url.pathname === "/dpdp/notice") {
+          if (req.method === "GET" && normalizedPath === "/dpdp/notice") {
             const response = await getDpdpNoticeHandler(req);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/dpdp/grievance") {
+          if (req.method === "POST" && normalizedPath === "/dpdp/grievance") {
             const response = await fileGrievanceHandler(req);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
-          if (req.method === "POST" && url.pathname === "/webhooks/dpdp/consent-manager") {
+          if (req.method === "POST" && normalizedPath === "/webhooks/dpdp/consent-manager") {
             const response = await consentManagerWebhookHandler(req);
             logRequest(req, startTime, response.status);
-            return addCors(response);
+            return finalHandler(response);
           }
 
           // ─── Phase 1 v1 Routes ───────────────────────────────────────────
 
           // Requisitions
-          if (req.method === "GET" && url.pathname === "/v1/requisitions") {
+          if (req.method === "GET" && normalizedPath === "/requisitions") {
             const response = await listRequisitionsHandler(req, context);
-            logRequest(req, startTime, response.status); return addCors(response);
+            logRequest(req, startTime, response.status); return finalHandler(response);
           }
-          if (req.method === "POST" && url.pathname === "/v1/requisitions") {
+          if (req.method === "POST" && normalizedPath === "/requisitions") {
             const response = await createRequisitionHandler(req, context);
-            logRequest(req, startTime, response.status); return addCors(response);
+            logRequest(req, startTime, response.status); return finalHandler(response);
           }
-          const reqMatch = url.pathname.match(/^\/v1\/requisitions\/([^/]+)$/);
+          const reqMatch = normalizedPath.match(/^\/requisitions\/([^/]+)$/);
           if (reqMatch) {
             const id = reqMatch[1];
-            if (req.method === "GET")    { const r = await getRequisitionHandler(req, context, id); logRequest(req, startTime, r.status); return addCors(r); }
-            if (req.method === "PATCH")  { const r = await updateRequisitionHandler(req, context, id); logRequest(req, startTime, r.status); return addCors(r); }
-            if (req.method === "DELETE") { const r = await deleteRequisitionHandler(req, context, id); logRequest(req, startTime, r.status); return addCors(r); }
+            if (req.method === "GET")    { const r = await getRequisitionHandler(req, context, id); logRequest(req, startTime, r.status); return finalHandler(r); }
+            if (req.method === "PATCH")  { const r = await updateRequisitionHandler(req, context, id); logRequest(req, startTime, r.status); return finalHandler(r); }
+            if (req.method === "DELETE") { const r = await deleteRequisitionHandler(req, context, id); logRequest(req, startTime, r.status); return finalHandler(r); }
           }
-          const reqApprove = url.pathname.match(/^\/v1\/requisitions\/([^/]+)\/approve$/);
+          const reqApprove = normalizedPath.match(/^\/requisitions\/([^/]+)\/approve$/);
           if (reqApprove && req.method === "POST") {
-            const r = await approveRequisitionHandler(req, context, reqApprove[1]); logRequest(req, startTime, r.status); return addCors(r);
+            const r = await approveRequisitionHandler(req, context, reqApprove[1]); logRequest(req, startTime, r.status); return finalHandler(r);
           }
-          const reqPublish = url.pathname.match(/^\/v1\/requisitions\/([^/]+)\/publish$/);
+          const reqPublish = normalizedPath.match(/^\/requisitions\/([^/]+)\/publish$/);
           if (reqPublish && req.method === "POST") {
-            const r = await publishRequisitionHandler(req, context, reqPublish[1]); logRequest(req, startTime, r.status); return addCors(r);
+            const r = await publishRequisitionHandler(req, context, reqPublish[1]); logRequest(req, startTime, r.status); return finalHandler(r);
           }
 
           // Offers
-          if (req.method === "POST" && url.pathname === "/v1/offers") {
+          if (req.method === "POST" && normalizedPath === "/offers") {
             const response = await createOfferHandler(req, context);
-            logRequest(req, startTime, response.status); return addCors(response);
+            logRequest(req, startTime, response.status); return finalHandler(response);
           }
-          if (req.method === "GET" && url.pathname === "/v1/offers/templates") {
-            const r = await listOfferTemplatesHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          if (req.method === "GET" && normalizedPath === "/offers/templates") {
+            const r = await listOfferTemplatesHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
           }
-          if (req.method === "POST" && url.pathname === "/v1/offers/templates") {
-            const r = await createOfferTemplateHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          if (req.method === "POST" && normalizedPath === "/offers/templates") {
+            const r = await createOfferTemplateHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
           }
-          const offerMatch = url.pathname.match(/^\/v1\/offers\/([^/]+)$/);
+          const offerMatch = normalizedPath.match(/^\/offers\/([^/]+)$/);
           if (offerMatch) {
             const id = offerMatch[1];
-            if (req.method === "GET")   { const r = await getOfferHandler(req, context, id); logRequest(req, startTime, r.status); return addCors(r); }
-            if (req.method === "PATCH") { const r = await updateOfferHandler(req, context, id); logRequest(req, startTime, r.status); return addCors(r); }
+            if (req.method === "GET")   { const r = await getOfferHandler(req, context, id); logRequest(req, startTime, r.status); return finalHandler(r); }
+            if (req.method === "PATCH") { const r = await updateOfferHandler(req, context, id); logRequest(req, startTime, r.status); return finalHandler(r); }
           }
-          const offerSend = url.pathname.match(/^\/v1\/offers\/([^/]+)\/send$/);
+          const offerSend = normalizedPath.match(/^\/offers\/([^/]+)\/send$/);
           if (offerSend && req.method === "POST") {
-            const r = await sendOfferHandler(req, context, offerSend[1]); logRequest(req, startTime, r.status); return addCors(r);
+            const r = await sendOfferHandler(req, context, offerSend[1]); logRequest(req, startTime, r.status); return finalHandler(r);
           }
-          const offerApprove = url.pathname.match(/^\/v1\/offers\/([^/]+)\/approve$/);
+          const offerApprove = normalizedPath.match(/^\/offers\/([^/]+)\/approve$/);
           if (offerApprove && req.method === "POST") {
-            const r = await approveOfferHandler(req, context, offerApprove[1]); logRequest(req, startTime, r.status); return addCors(r);
+            const r = await approveOfferHandler(req, context, offerApprove[1]); logRequest(req, startTime, r.status); return finalHandler(r);
           }
-          const offerWithdraw = url.pathname.match(/^\/v1\/offers\/([^/]+)\/withdraw$/);
+          const offerWithdraw = normalizedPath.match(/^\/offers\/([^/]+)\/withdraw$/);
           if (offerWithdraw && req.method === "POST") {
-            const r = await withdrawOfferHandler(req, context, offerWithdraw[1]); logRequest(req, startTime, r.status); return addCors(r);
+            const r = await withdrawOfferHandler(req, context, offerWithdraw[1]); logRequest(req, startTime, r.status); return finalHandler(r);
           }
 
           // BGV
-          if (req.method === "POST" && url.pathname === "/v1/bgv") {
-            const r = await initiateBGVHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          if (req.method === "POST" && normalizedPath === "/bgv") {
+            const r = await initiateBGVHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
           }
-          if (req.method === "POST" && url.pathname === "/v1/bgv/webhook") {
-            const r = await bgvWebhookHandler(req); logRequest(req, startTime, r.status); return addCors(r);
+          if (req.method === "POST" && (normalizedPath === "/bgv/webhook" || normalizedPath === "/webhooks/bgv")) {
+            const { valid, rawBody } = await verifyWebhookSignature(req, "bgv");
+            if (!valid) { logRequest(req, startTime, 401); return finalHandler(Response.json({ success: false, error: { code: "INVALID_SIGNATURE", message: "Webhook signature verification failed", requestId: crypto.randomUUID() } }, { status: 401 })); }
+            const r = await bgvWebhookHandler(reconstructRequest(req, rawBody)); logRequest(req, startTime, r.status); return finalHandler(r);
           }
-          const bgvMatch = url.pathname.match(/^\/v1\/bgv\/([^/]+)$/);
+          const bgvMatch = normalizedPath.match(/^\/bgv\/([^/]+)$/);
           if (bgvMatch) {
             const id = bgvMatch[1];
-            if (req.method === "GET") { const r = await getBGVHandler(req, context, id); logRequest(req, startTime, r.status); return addCors(r); }
+            if (req.method === "GET") { const r = await getBGVHandler(req, context, id); logRequest(req, startTime, r.status); return finalHandler(r); }
           }
-          const bgvDecide = url.pathname.match(/^\/v1\/bgv\/([^/]+)\/decide$/);
+          const bgvDecide = normalizedPath.match(/^\/bgv\/([^/]+)\/decide$/);
           if (bgvDecide && req.method === "POST") {
-            const r = await decideBGVHandler(req, context, bgvDecide[1]); logRequest(req, startTime, r.status); return addCors(r);
+            const r = await decideBGVHandler(req, context, bgvDecide[1]); logRequest(req, startTime, r.status); return finalHandler(r);
           }
 
           // ─── Phase 2 v1 Routes ───────────────────────────────────────────
 
           // Job Postings
-          if (req.method === "GET" && url.pathname === "/v1/job-postings") {
-            const r = await listJobPostingsHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          if (req.method === "GET" && normalizedPath === "/job-postings") {
+            const r = await listJobPostingsHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
           }
-          if (req.method === "POST" && url.pathname === "/v1/job-postings") {
-            const r = await publishJobPostingHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          if (req.method === "POST" && normalizedPath === "/job-postings") {
+            const r = await publishJobPostingHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
           }
-          const jpMatch = url.pathname.match(/^\/v1\/job-postings\/([^/]+)$/);
+          const jpMatch = normalizedPath.match(/^\/job-postings\/([^/]+)$/);
           if (jpMatch) {
             const id = jpMatch[1];
-            if (req.method === "GET")    { const r = await getJobPostingMetricsHandler(req, context, id); logRequest(req, startTime, r.status); return addCors(r); }
-            if (req.method === "DELETE") { const r = await unpublishJobPostingHandler(req, context, id); logRequest(req, startTime, r.status); return addCors(r); }
+            if (req.method === "GET")    { const r = await getJobPostingMetricsHandler(req, context, id); logRequest(req, startTime, r.status); return finalHandler(r); }
+            if (req.method === "DELETE") { const r = await unpublishJobPostingHandler(req, context, id); logRequest(req, startTime, r.status); return finalHandler(r); }
           }
-          const jpSync = url.pathname.match(/^\/v1\/job-postings\/([^/]+)\/sync$/);
+          const jpSync = normalizedPath.match(/^\/job-postings\/([^/]+)\/sync$/);
           if (jpSync && req.method === "POST") {
-            const r = await syncApplicationsHandler(req, context, jpSync[1]); logRequest(req, startTime, r.status); return addCors(r);
+            const r = await syncApplicationsHandler(req, context, jpSync[1]); logRequest(req, startTime, r.status); return finalHandler(r);
           }
 
           // Talent Pool
-          if (req.method === "GET" && url.pathname === "/v1/talent-pool") {
-            const r = await searchTalentPoolHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          if (req.method === "GET" && normalizedPath === "/talent-pool") {
+            const r = await searchTalentPoolHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
           }
-          if (req.method === "POST" && url.pathname === "/v1/talent-pool") {
-            const r = await addToTalentPoolHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          if (req.method === "POST" && normalizedPath === "/talent-pool") {
+            const r = await addToTalentPoolHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
           }
-          if (req.method === "POST" && url.pathname === "/v1/talent-pool/bulk-import") {
-            const r = await bulkImportHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          if (req.method === "POST" && normalizedPath === "/talent-pool/search") {
+            const r = await semanticSearchHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
           }
-          const tpMatch = url.pathname.match(/^\/v1\/talent-pool\/([^/]+)$/);
+          if (req.method === "POST" && normalizedPath === "/talent-pool/bulk-import") {
+            const r = await bulkImportHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
+          }
+          const tpMatch = normalizedPath.match(/^\/talent-pool\/([^/]+)$/);
           if (tpMatch) {
             const id = tpMatch[1];
-            if (req.method === "GET")   { const r = await getTalentProfileHandler(req, context, id); logRequest(req, startTime, r.status); return addCors(r); }
-            if (req.method === "PATCH") { const r = await updateTalentProfileHandler(req, context, id); logRequest(req, startTime, r.status); return addCors(r); }
+            if (req.method === "GET")   { const r = await getTalentProfileHandler(req, context, id); logRequest(req, startTime, r.status); return finalHandler(r); }
+            if (req.method === "PATCH") { const r = await updateTalentProfileHandler(req, context, id); logRequest(req, startTime, r.status); return finalHandler(r); }
           }
-          const tpNurture = url.pathname.match(/^\/v1\/talent-pool\/([^/]+)\/nurture$/);
+          const tpNurture = normalizedPath.match(/^\/talent-pool\/([^/]+)\/nurture$/);
           if (tpNurture && req.method === "POST") {
-            const r = await enrollNurtureHandler(req, context, tpNurture[1]); logRequest(req, startTime, r.status); return addCors(r);
+            const r = await enrollNurtureHandler(req, context, tpNurture[1]); logRequest(req, startTime, r.status); return finalHandler(r);
           }
 
           // Referrals
-          if (req.method === "POST" && url.pathname === "/v1/referrals") {
-            const r = await submitReferralHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          if (req.method === "POST" && normalizedPath === "/referrals") {
+            const r = await submitReferralHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
           }
-          if (req.method === "GET" && url.pathname === "/v1/referrals") {
-            const r = await listReferralsHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          if (req.method === "GET" && normalizedPath === "/referrals") {
+            const r = await listReferralsHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
           }
-          const refMatch = url.pathname.match(/^\/v1\/referrals\/([^/]+)\/status$/);
+          const refMatch = normalizedPath.match(/^\/referrals\/([^/]+)\/status$/);
           if (refMatch && req.method === "PATCH") {
-            const r = await updateReferralStatusHandler(req, context, refMatch[1]); logRequest(req, startTime, r.status); return addCors(r);
+            const r = await updateReferralStatusHandler(req, context, refMatch[1]); logRequest(req, startTime, r.status); return finalHandler(r);
           }
-          const refBonus = url.pathname.match(/^\/v1\/referrals\/([^/]+)\/bonus$/);
+          const refBonus = normalizedPath.match(/^\/referrals\/([^/]+)\/bonus$/);
           if (refBonus && req.method === "POST") {
-            const r = await payReferralBonusHandler(req, context, refBonus[1]); logRequest(req, startTime, r.status); return addCors(r);
+            const r = await payReferralBonusHandler(req, context, refBonus[1]); logRequest(req, startTime, r.status); return finalHandler(r);
           }
 
           // Nurture Sequences & Outreach
-          if (req.method === "GET" && url.pathname === "/v1/nurture/sequences") {
-            const r = await listSequencesHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          if (req.method === "GET" && normalizedPath === "/nurture/sequences") {
+            const r = await listSequencesHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
           }
-          if (req.method === "POST" && url.pathname === "/v1/nurture/sequences") {
-            const r = await createSequenceHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          if (req.method === "POST" && normalizedPath === "/nurture/sequences") {
+            const r = await createSequenceHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
           }
-          if (req.method === "POST" && url.pathname === "/v1/outreach/send-email") {
-            const r = await sendOutreachEmailHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          if (req.method === "POST" && normalizedPath === "/outreach/send-email") {
+            const r = await sendOutreachEmailHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
           }
-          if (req.method === "GET" && url.pathname === "/v1/outreach") {
-            const r = await listOutreachHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          if (req.method === "GET" && normalizedPath === "/outreach") {
+            const r = await listOutreachHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
           }
 
           // ─── Phase 3 v1 Routes ───────────────────────────────────────────
 
           // Video Interviews
-          if (req.method === "GET" && url.pathname === "/v1/video-sessions") {
-            const r = await listVideoSessionsHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          if (req.method === "GET" && normalizedPath === "/video-sessions") {
+            const r = await listVideoSessionsHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
           }
-          if (req.method === "POST" && url.pathname === "/v1/video-sessions") {
-            const r = await createVideoSessionHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          if (req.method === "POST" && normalizedPath === "/video-sessions") {
+            const r = await createVideoSessionHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
           }
-          const videoMatch = url.pathname.match(/^\/v1\/video-sessions\/([^/]+)$/);
+          const videoMatch = normalizedPath.match(/^\/video-sessions\/([^/]+)$/);
           if (videoMatch) {
-            if (req.method === "GET") { const r = await getVideoSessionHandler(req, context, videoMatch[1]); logRequest(req, startTime, r.status); return addCors(r); }
+            if (req.method === "GET") { const r = await getVideoSessionHandler(req, context, videoMatch[1]); logRequest(req, startTime, r.status); return finalHandler(r); }
           }
 
           // Knowledge / RAG
-          if (req.method === "GET" && url.pathname === "/v1/knowledge") {
-            const r = await listDocumentsHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          if (req.method === "GET" && normalizedPath === "/knowledge") {
+            const r = await listDocumentsHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
           }
-          if (req.method === "POST" && url.pathname === "/v1/knowledge/ingest") {
-            const r = await ingestDocumentHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          if (req.method === "POST" && normalizedPath === "/knowledge/ingest") {
+            const r = await ingestDocumentHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
           }
-          if (req.method === "POST" && url.pathname === "/v1/knowledge/query") {
-            const r = await queryKnowledgeHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          if (req.method === "POST" && normalizedPath === "/knowledge/query") {
+            const r = await queryKnowledgeHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
           }
-          const knowledgeMatch = url.pathname.match(/^\/v1\/knowledge\/([^/]+)$/);
+          const knowledgeMatch = normalizedPath.match(/^\/knowledge\/([^/]+)$/);
           if (knowledgeMatch && req.method === "DELETE") {
-            const r = await deleteDocumentHandler(req, context, knowledgeMatch[1]); logRequest(req, startTime, r.status); return addCors(r);
+            const r = await deleteDocumentHandler(req, context, knowledgeMatch[1]); logRequest(req, startTime, r.status); return finalHandler(r);
+          }
+
+          // ─── Webhooks (Unified) ──────────────────────────────────────────
+
+          if (req.method === "POST" && normalizedPath === "/webhooks/video") {
+            const { valid, rawBody } = await verifyWebhookSignature(req, "video");
+            if (!valid) { logRequest(req, startTime, 401); return finalHandler(Response.json({ success: false, error: { code: "INVALID_SIGNATURE", message: "Webhook signature verification failed", requestId: crypto.randomUUID() } }, { status: 401 })); }
+            const r = await videoWebhookHandler(reconstructRequest(req, rawBody)); logRequest(req, startTime, r.status); return finalHandler(r);
+          }
+          if (req.method === "POST" && (normalizedPath === "/webhooks/outreach" || normalizedPath === "/webhooks/outreach/tracking")) {
+            const { valid, rawBody } = await verifyWebhookSignature(req, "outreach");
+            if (!valid) { logRequest(req, startTime, 401); return finalHandler(Response.json({ success: false, error: { code: "INVALID_SIGNATURE", message: "Webhook signature verification failed", requestId: crypto.randomUUID() } }, { status: 401 })); }
+            const r = await outreachTrackingWebhook(reconstructRequest(req, rawBody)); logRequest(req, startTime, r.status); return finalHandler(r);
+          }
+          if (req.method === "POST" && normalizedPath === "/webhooks/esign") {
+            const { valid, rawBody } = await verifyWebhookSignature(req, "docusign");
+            if (!valid) { logRequest(req, startTime, 401); return finalHandler(Response.json({ success: false, error: { code: "INVALID_SIGNATURE", message: "Webhook signature verification failed", requestId: crypto.randomUUID() } }, { status: 401 })); }
+            const r = await esignWebhookHandler(reconstructRequest(req, rawBody)); logRequest(req, startTime, r.status); return finalHandler(r);
           }
 
           // Fairness / Bias Detection
-          if (req.method === "POST" && url.pathname === "/v1/fairness/scan-jd") {
-            const r = await scanJDHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          if (req.method === "POST" && normalizedPath === "/fairness/scan-jd") {
+            const r = await scanJDHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
           }
-          if (req.method === "POST" && url.pathname === "/v1/fairness/report") {
-            const r = await generateBiasReportHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          if (req.method === "POST" && normalizedPath === "/fairness/report") {
+            const r = await generateBiasReportHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
           }
 
           // Predictive Models
-          if (req.method === "POST" && url.pathname === "/v1/predictions/offer-acceptance") {
-            const r = await predictOfferAcceptanceHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          if (req.method === "POST" && normalizedPath === "/predictions/offer-acceptance") {
+            const r = await predictOfferAcceptanceHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
           }
-          if (req.method === "POST" && url.pathname === "/v1/predictions/time-to-fill") {
-            const r = await predictTimeToFillHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          if (req.method === "POST" && normalizedPath === "/predictions/time-to-fill") {
+            const r = await predictTimeToFillHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
           }
-          if (req.method === "POST" && url.pathname === "/v1/predictions/retention-risk") {
-            const r = await predictRetentionRiskHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          if (req.method === "POST" && normalizedPath === "/predictions/retention-risk") {
+            const r = await predictRetentionRiskHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
           }
-          if (req.method === "POST" && url.pathname === "/v1/predictions/outcomes") {
-            const r = await recordOutcomeHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+
+          // Compliance
+          if (req.method === "GET" && normalizedPath === "/compliance/eeo-report") {
+            const r = await getEeoReportHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
           }
-          if (req.method === "GET" && url.pathname === "/v1/predictions/weights") {
-            const r = await getAIWeightsHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          if (req.method === "POST" && normalizedPath === "/compliance/gdpr-purge") {
+            const r = await deleteCandidateGdprHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
+          }
+          if (req.method === "POST" && normalizedPath === "/predictions/outcomes") {
+            const r = await recordOutcomeHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
+          }
+          if (req.method === "GET" && normalizedPath === "/predictions/weights") {
+            const r = await getAIWeightsHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
           }
 
           // ─── Phase 5 v1 Routes ───────────────────────────────────────────
-          if (req.method === "GET" && url.pathname === "/v1/auth/api-keys") {
-            const r = await listAPIKeysHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          if (req.method === "GET" && normalizedPath === "/auth/api-keys") {
+            const r = await listAPIKeysHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
           }
-          if (req.method === "POST" && url.pathname === "/v1/auth/api-keys") {
-            const r = await createAPIKeyHandler(req, context); logRequest(req, startTime, r.status); return addCors(r);
+          if (req.method === "POST" && normalizedPath === "/auth/api-keys") {
+            const r = await createAPIKeyHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
           }
-          const apiKeyMatch = url.pathname.match(/^\/v1\/auth\/api-keys\/([^/]+)$/);
+          const apiKeyMatch = normalizedPath.match(/^\/auth\/api-keys\/([^/]+)$/);
           if (apiKeyMatch && req.method === "DELETE") {
-            const r = await revokeAPIKeyHandler(req, context, apiKeyMatch[1]); logRequest(req, startTime, r.status); return addCors(r);
+            const r = await revokeAPIKeyHandler(req, context, apiKeyMatch[1]); logRequest(req, startTime, r.status); return finalHandler(r);
           }
 
-          // ─────────────────────────────────────────────────────────────────
+          // ─── Phase 4 v1 Routes ───────────────────────────────────────────
+          if (req.method === "GET" && normalizedPath === "/workflows") {
+            const r = await listWorkflowsHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
+          }
+          if (req.method === "POST" && normalizedPath === "/workflows") {
+            const r = await createWorkflowHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
+          }
+          const workflowMatch = normalizedPath.match(/^\/workflows\/([^/]+)$/);
+          if (workflowMatch) {
+            if (req.method === "PATCH") {
+                const r = await updateWorkflowHandler(req, context, workflowMatch[1]); logRequest(req, startTime, r.status); return finalHandler(r);
+            }
+            if (req.method === "DELETE") {
+                const r = await deleteWorkflowHandler(req, context, workflowMatch[1]); logRequest(req, startTime, r.status); return finalHandler(r);
+            }
+          }
+
+          if (req.method === "POST" && normalizedPath === "/reports/generate") {
+            const r = await generateReportHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
+          }
+
+          if (req.method === "GET" && normalizedPath === "/onboarding") {
+            const r = await listOnboardingHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
+          }
+          if (req.method === "POST" && normalizedPath === "/onboarding/initiate") {
+            const r = await initiateOnboardingHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
+          }
+          const onboardingMatch = normalizedPath.match(/^\/onboarding\/([^/]+)\/tasks$/);
+          if (onboardingMatch && req.method === "PATCH") {
+            const r = await updateOnboardingTaskHandler(req, context, onboardingMatch[1]); logRequest(req, startTime, r.status); return finalHandler(r);
+          }
 
           logRequest(req, startTime, 404);
-          return addCors(new Response(JSON.stringify({ error: "Route not found" }), { status: 404 }));
+          return finalHandler(new Response(JSON.stringify({ error: "Route not found" }), { status: 404 }));
 
         } catch (error) {
           console.error(`[Index] Unhandled error:`, error);
           logRequest(req, startTime, 500);
-          return addCors(new Response(JSON.stringify({ error: "Internal server error" }), { status: 500 }));
+          return finalHandler(new Response(JSON.stringify({ error: "Internal server error" }), { status: 500 }));
         }
       }
     });
@@ -776,3 +916,11 @@ setInterval(async () => {
       console.error('[Maintenance] Retention check failed:', e);
     }
 }, 1000 * 60 * 60 * 24);
+
+setInterval(async () => {
+    try {
+      await SequenceEngine.processDueSteps();
+    } catch (e) {
+      console.error('[Maintenance] Nurture processing failed:', e);
+    }
+}, 1000 * 60 * 60); // Check every hour
