@@ -77,6 +77,12 @@ import {
   predictRetentionRiskHandler, recordOutcomeHandler, getAIWeightsHandler
 } from "./routes/v1/predictions";
 
+import {
+  listIntegrationsHandler, connectIntegrationHandler,
+  disconnectIntegrationHandler, getIntegrationStatusHandler
+} from "./routes/v1/integrations";
+import { listClientsHandler, addClientHandler, removeClientHandler } from "./routes/v1/agency";
+
 // Phase 2 — v1 routes
 import {
   listJobPostingsHandler, publishJobPostingHandler, getJobPostingMetricsHandler,
@@ -871,6 +877,32 @@ async function startServer() {
             return finalHandler(await getWorkflowHistoryHandler(req, context));
           if (req.method === "GET" && normalizedPath.match(/^\/workflows\/runs\/[^/]+$/))
             return finalHandler(await getWorkflowRunHandler(req, context));
+
+          // Integration marketplace routes
+          if (req.method === "GET" && normalizedPath === "/integrations")
+            return finalHandler(await listIntegrationsHandler(req, context));
+          if (req.method === "POST" && normalizedPath.match(/^\/integrations\/[^/]+\/connect$/)) {
+            const integrationId = normalizedPath.split("/")[2];
+            return finalHandler(await connectIntegrationHandler(req, context, integrationId));
+          }
+          if (req.method === "DELETE" && normalizedPath.match(/^\/integrations\/[^/]+$/)) {
+            const integrationId = normalizedPath.split("/")[2];
+            return finalHandler(await disconnectIntegrationHandler(req, context, integrationId));
+          }
+          if (req.method === "GET" && normalizedPath.match(/^\/integrations\/[^/]+\/status$/)) {
+            const integrationId = normalizedPath.split("/")[2];
+            return finalHandler(await getIntegrationStatusHandler(req, context, integrationId));
+          }
+
+          // Agency routes
+          if (req.method === "GET" && normalizedPath === "/agency/clients")
+            return finalHandler(await listClientsHandler(req, context));
+          if (req.method === "POST" && normalizedPath === "/agency/clients")
+            return finalHandler(await addClientHandler(req, context));
+          if (req.method === "DELETE" && normalizedPath.match(/^\/agency\/clients\/[^/]+$/)) {
+            const clientTenantId = normalizedPath.split("/")[3];
+            return finalHandler(await removeClientHandler(req, context, clientTenantId));
+          }
 
           if (req.method === "POST" && normalizedPath === "/reports/generate") {
             const r = await generateReportHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
