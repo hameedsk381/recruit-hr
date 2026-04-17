@@ -1,4 +1,4 @@
-import { ObjectId } from "mongodb";
+import { Collection, ObjectId } from "mongodb";
 import { getMongoDb } from "../../utils/mongoClient";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -151,7 +151,7 @@ export class WorkflowEngine {
         payload,
         tenantId,
         runId,
-        runsCollection
+        runsCollection as Collection<WorkflowRun>
       );
 
       await runsCollection.updateOne(
@@ -168,107 +168,101 @@ export class WorkflowEngine {
   }
 
   private static async traverseFrom(
-    nodeId: string,
+    startNodeId: string,
     workflow: WorkflowDefinition,
     payload: Record<string, unknown>,
     tenantId: string,
     runId: string,
-    runsCollection: ReturnType<typeof getMongoDb>["collection"]
+    runsCollection: Collection<WorkflowRun>
   ): Promise<void> {
-    const node = workflow.nodes.find((n) => n.id === nodeId);
-    if (!node) return;
+    const visited = new Set<string>();
+    let currentId: string | null = startNodeId;
 
-    // Update current node in run record
-    await runsCollection.updateOne(
-      { _id: new ObjectId(runId) },
-      { $set: { currentNodeId: nodeId } }
-    );
+    while (currentId) {
+      if (visited.has(currentId)) {
+        console.error(`[WorkflowEngine] Cycle detected at node ${currentId} in workflow ${workflow._id} — stopping`);
+        break;
+      }
+      visited.add(currentId);
 
-    let nextNodeId: string | null = null;
+      const node = workflow.nodes.find((n) => n.id === currentId);
+      if (!node) break;
 
-    switch (node.type) {
-      case "action": {
-        const actionType = node.config.actionType as string;
-        const handler = ACTION_HANDLERS[actionType];
-        if (handler) {
-          await handler(payload, (node.config.params as Record<string, unknown>) ?? {}, tenantId);
-        } else {
-          console.warn(`[WorkflowEngine] No handler for action type: ${actionType}`);
+      await runsCollection.updateOne(
+        { _id: new ObjectId(runId) },
+        { $set: { currentNodeId: currentId } }
+      );
+
+      let nextId: string | null = null;
+
+      switch (node.type) {
+        case "action": {
+          const actionType = node.config.actionType as string;
+          const handler = ACTION_HANDLERS[actionType];
+          if (handler) {
+            await handler(payload, (node.config.params as Record<string, unknown>) ?? {}, tenantId);
+          } else {
+            console.warn(`[WorkflowEngine] No handler for action type: ${actionType}`);
+          }
+          nextId = workflow.edges.find((e) => e.source === currentId)?.target ?? null;
+          break;
         }
-        const edge = workflow.edges.find((e) => e.source === nodeId);
-        nextNodeId = edge?.target ?? null;
-        break;
-      }
 
-      case "condition": {
-        const result = evaluateCondition(node.config as unknown as ConditionConfig, payload);
-        const label = result ? "true" : "false";
-        const edge = workflow.edges.find((e) => e.source === nodeId && e.label === label)
-          ?? workflow.edges.find((e) => e.source === nodeId);
-        nextNodeId = edge?.target ?? null;
-        break;
-      }
+        case "condition": {
+          const result = evaluateCondition(node.config as unknown as ConditionConfig, payload);
+          const label = result ? "true" : "false";
+          nextId = (
+            workflow.edges.find((e) => e.source === currentId && e.label === label) ??
+            workflow.edges.find((e) => e.source === currentId)
+          )?.target ?? null;
+          break;
+        }
 
-      case "delay": {
-        const delayMs = Number(node.config.delayMs ?? 0);
-        if (delayMs > 0) {
-          // Dynamically import to avoid circular dependency issues at startup
-          const { enqueueDelayedResume } = await import("../../services/queueService");
-          await enqueueDelayedResume(runId, workflow._id.toString(), nodeId, delayMs);
+        case "delay": {
+          const delayMs = Number(node.config.delayMs ?? 0);
+          if (delayMs > 0) {
+            const { enqueueDelayedResume } = await import("../../services/queueService");
+            await enqueueDelayedResume(runId, workflow._id.toString(), currentId, delayMs);
+            await runsCollection.updateOne(
+              { _id: new ObjectId(runId) },
+              { $set: { status: "paused" } }
+            );
+            return; // BullMQ resumes from next node
+          }
+          nextId = workflow.edges.find((e) => e.source === currentId)?.target ?? null;
+          break;
+        }
 
+        case "notification": {
+          const { title, message, channels = [] } = node.config as {
+            title: string; message: string; channels: string[]; recipientEmail?: string;
+          };
+          console.log(`[WorkflowEngine] Notification — ${title}: ${message} via ${channels.join(", ")}`);
+          nextId = workflow.edges.find((e) => e.source === currentId)?.target ?? null;
+          break;
+        }
+
+        case "integration": {
+          console.log(`[WorkflowEngine] Integration node — type: ${node.config.integrationType}`);
+          nextId = workflow.edges.find((e) => e.source === currentId)?.target ?? null;
+          break;
+        }
+
+        case "approval": {
           await runsCollection.updateOne(
             { _id: new ObjectId(runId) },
             { $set: { status: "paused" } }
           );
-          return; // BullMQ will resume from next node
+          return;
         }
-        const edge = workflow.edges.find((e) => e.source === nodeId);
-        nextNodeId = edge?.target ?? null;
-        break;
+
+        default: {
+          console.warn(`[WorkflowEngine] Unknown node type: ${node.type}`);
+          nextId = workflow.edges.find((e) => e.source === currentId)?.target ?? null;
+        }
       }
 
-      case "notification": {
-        const { title, message, channels = [] } = node.config as {
-          title: string; message: string; channels: string[]; recipientEmail?: string;
-        };
-        console.log(`[WorkflowEngine] Notification — ${title}: ${message} via ${channels.join(", ")}`);
-        const edge = workflow.edges.find((e) => e.source === nodeId);
-        nextNodeId = edge?.target ?? null;
-        break;
-      }
-
-      case "integration": {
-        console.log(`[WorkflowEngine] Integration node — type: ${node.config.integrationType}`);
-        const edge = workflow.edges.find((e) => e.source === nodeId);
-        nextNodeId = edge?.target ?? null;
-        break;
-      }
-
-      case "approval": {
-        // Pause execution until approval is granted externally
-        await runsCollection.updateOne(
-          { _id: new ObjectId(runId) },
-          { $set: { status: "paused" } }
-        );
-        return;
-      }
-
-      default: {
-        console.warn(`[WorkflowEngine] Unknown node type: ${node.type}`);
-        const edge = workflow.edges.find((e) => e.source === nodeId);
-        nextNodeId = edge?.target ?? null;
-      }
-    }
-
-    if (nextNodeId) {
-      await WorkflowEngine.traverseFrom(
-        nextNodeId,
-        workflow,
-        payload,
-        tenantId,
-        runId,
-        runsCollection as any
-      );
+      currentId = nextId;
     }
   }
 
@@ -286,6 +280,10 @@ export class WorkflowEngine {
 
     if (!run) {
       console.warn(`[WorkflowEngine] resumeRun: run ${runId} not found`);
+      return;
+    }
+    if (run.status !== "paused") {
+      console.warn(`[WorkflowEngine] resumeRun: run ${runId} not in paused state (status: ${run.status}), skipping`);
       return;
     }
 
@@ -320,7 +318,7 @@ export class WorkflowEngine {
         run.payload,
         run.tenantId,
         runId,
-        runsCollection as any
+        runsCollection as Collection<WorkflowRun>
       );
 
       await runsCollection.updateOne(
