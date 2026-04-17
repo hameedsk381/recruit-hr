@@ -1,26 +1,24 @@
-import { describe, it, expect, mock } from "bun:test";
+import { describe, it, expect, mock, beforeEach } from "bun:test";
 
-// Mock ioredis before importing queueService
-mock.module("ioredis", () => {
-  return {
-    default: class FakeRedis {
-      status = "ready";
-      on() { return this; }
-      connect() { return Promise.resolve(); }
-      disconnect() { return Promise.resolve(); }
-    }
-  };
-});
-
-// Mock bullmq
+// Must mock BEFORE importing the module under test
 const mockAdd = mock(() => Promise.resolve({ id: "job-1" }));
+
+mock.module("ioredis", () => ({
+  default: class FakeRedis {
+    status = "ready";
+    on() { return this; }
+    connect() { return Promise.resolve(); }
+    disconnect() { return Promise.resolve(); }
+  }
+}));
+
 mock.module("bullmq", () => ({
   Queue: class FakeQueue {
     add = mockAdd;
     constructor() {}
   },
   Worker: class FakeWorker {
-    constructor(_name: string, _processor: Function) {}
+    constructor() {}
     on() { return this; }
   },
   QueueEvents: class FakeQueueEvents {
@@ -29,9 +27,14 @@ mock.module("bullmq", () => ({
   }
 }));
 
+// Import AFTER mocks are set up
 import { enqueueDelayedResume } from "../services/queueService";
 
 describe("enqueueDelayedResume", () => {
+  beforeEach(() => {
+    mockAdd.mockClear();
+  });
+
   it("enqueues a delayed-resume job with correct data and delay", async () => {
     await enqueueDelayedResume("run-abc", "wf-xyz", "node-1", 5000);
     expect(mockAdd).toHaveBeenCalledTimes(1);
