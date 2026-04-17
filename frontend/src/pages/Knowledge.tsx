@@ -3,6 +3,7 @@ import api from '../api/client';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2, Search, BookOpen, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PageGuide } from '@/components/PageGuide';
 
 const DOC_TYPES = ['comp_bands', 'role_framework', 'policy', 'handbook', 'sop', 'other'];
 const TYPE_LABELS: Record<string, string> = {
@@ -64,6 +65,21 @@ export default function Knowledge() {
 
     return (
         <div className="space-y-6 max-w-4xl">
+            <PageGuide
+              pageKey="knowledge"
+              title="How the Knowledge Base Works"
+              steps={[
+                { title: "Ingest your documents", description: "Click 'Add Document' and paste in the text of your HR policies, comp bands, role frameworks, or SOPs. Give each a descriptive name and type." },
+                { title: "Ask questions naturally", description: "Use the search bar to ask questions in plain English — e.g. 'What is the leave policy for new employees?' The AI retrieves relevant passages and cites the source." },
+                { title: "Answers cite sources", description: "Every answer includes citations pointing back to the specific document it drew from, so you can verify accuracy." },
+                { title: "Keep it updated", description: "Delete outdated documents and re-ingest updated versions. The AI always uses the latest ingested version." },
+              ]}
+              tips={[
+                "Use descriptive filenames — the AI uses them to understand document context.",
+                "Comp bands and role frameworks work best as structured text (not PDFs scanned as images).",
+                "The knowledge base is per-tenant — each company's data is isolated.",
+              ]}
+            />
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-black tracking-tight">Knowledge Base</h1>

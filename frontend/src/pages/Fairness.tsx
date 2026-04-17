@@ -3,6 +3,7 @@ import api from '../api/client';
 import { Button } from '@/components/ui/button';
 import { ShieldCheck, AlertTriangle, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PageGuide } from '@/components/PageGuide';
 
 type Tab = 'scan' | 'report';
 
@@ -53,6 +54,21 @@ export default function Fairness() {
 
     return (
         <div className="space-y-6 max-w-3xl">
+            <PageGuide
+              pageKey="fairness"
+              title="How Fairness & Bias Tools Work"
+              steps={[
+                { title: "Scan a Job Description", description: "Paste any JD text into the scanner. The AI flags gender-coded language, age bias, credential inflation, and cultural exclusion phrases that may deter qualified candidates." },
+                { title: "Review the flags", description: "Each flag shows the exact phrase, the bias type, and a suggested neutral alternative. Revise your JD before posting." },
+                { title: "Generate a Bias Report", description: "Enter a Requisition ID and date range to see a statistical breakdown of screening decisions — acceptance rates by demographic group help identify systemic gaps." },
+                { title: "Act on findings", description: "Use report findings to update job templates, retrain interviewers, or adjust scoring rubrics to reduce unconscious bias over time." },
+              ]}
+              tips={[
+                "Run every JD through the scanner before publishing — it takes 10 seconds.",
+                "Bias reports are most useful when run quarterly across multiple requisitions.",
+                "'Clean' scans (no flags) are still worth saving as proof of due diligence.",
+              ]}
+            />
             <div>
                 <h1 className="text-2xl font-black tracking-tight">Fairness & Bias Detection</h1>
                 <p className="text-sm text-muted-foreground mt-1">Detect and eliminate bias in job descriptions and hiring funnels</p>

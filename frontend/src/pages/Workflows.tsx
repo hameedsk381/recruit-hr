@@ -18,6 +18,7 @@ import {
   XCircle, Clock, PauseCircle, AlertTriangle
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
+import { PageGuide } from '@/components/PageGuide';
 
 const API_BASE = '/v1';
 const getHeaders = () => ({
@@ -168,6 +169,21 @@ export default function Workflows() {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      <PageGuide
+        pageKey="workflows"
+        title="How Workflow Automations Work"
+        steps={[
+          { title: "Create a workflow", description: "Click 'New Workflow', give it a name, and pick a trigger event — for example, 'Candidate Applied' fires whenever a new application comes in." },
+          { title: "Activate it", description: "Toggle the switch in the Active column to ON. Inactive workflows are saved but never run — useful for drafts." },
+          { title: "View run history", description: "Click 'History' next to any workflow to see every execution: when it ran, which nodes it passed through, and whether it succeeded or failed." },
+          { title: "Add actions via integrations", description: "Connect your email, Slack, or BGV provider in the Marketplace, then those integrations become available as action nodes in your workflows." },
+        ]}
+        tips={[
+          "Workflows run automatically — no manual trigger needed once activated.",
+          "A 'paused' run means a delay node is waiting. It will resume automatically.",
+          "Deactivate before editing to avoid running a half-finished workflow.",
+        ]}
+      />
       {/* Header */}
       <div className="flex items-end justify-between gap-6">
         <div className="space-y-2">

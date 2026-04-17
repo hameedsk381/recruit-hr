@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
+import { PageGuide } from '@/components/PageGuide';
 
 export default function Shortlist() {
     const {
@@ -271,6 +272,21 @@ export default function Shortlist() {
 
     return (
         <div className="container mx-auto max-w-6xl px-4 py-8 space-y-8 animate-in fade-in duration-500">
+            <PageGuide
+              pageKey="shortlist"
+              title="How AI Shortlisting Works"
+              steps={[
+                { title: "Set up the job first", description: "Use Job Setup to define the role requirements — skills, experience, and responsibilities. The AI uses this as the benchmark for scoring." },
+                { title: "Upload resumes", description: "Drag and drop a batch of resumes (PDF or Word). The AI extracts structured data and scores each candidate against the job requirements." },
+                { title: "Review scores and flags", description: "Each candidate gets a match score and flag indicators. Hover over the score to see the reasoning breakdown — skills gap, experience delta, and keyword alignment." },
+                { title: "Pin, reject, or advance", description: "Pin strong candidates to keep them visible. Remove weak fits to clean the list. Use the shortlist checkbox to send selected candidates to the interview pipeline." },
+              ]}
+              tips={[
+                "Upload 20–30 resumes at once for the best batch-comparison view.",
+                "The AI copilot (chat icon) can answer questions about any candidate's background.",
+                "Pinned candidates persist across sessions — use them as your A-list.",
+              ]}
+            />
             {/* Header section */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-border/50 pb-6">
                 <div className="space-y-1">

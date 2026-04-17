@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import api from '../api/client';
+import { PageGuide } from '@/components/PageGuide';
 
 const toast = {
     success: (msg: string) => alert(`Success: ${msg}`),
@@ -141,6 +142,21 @@ export default function Marketplace() {
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <PageGuide
+              pageKey="marketplace"
+              title="How Integrations Work"
+              steps={[
+                { title: "Find your integration", description: "Browse or search by category (ATS, HRIS, BGV, etc.). All 24 integrations are available to connect — none require OAuth, just API credentials." },
+                { title: "Click Connect", description: "A form will appear asking for the API key or webhook secret for that service. You can find these in your provider's developer or settings portal." },
+                { title: "Credentials are encrypted", description: "Your API keys are encrypted with AES-256-GCM before storage. They are never returned in API responses — only existence is confirmed." },
+                { title: "Use in workflows", description: "Once connected, the integration becomes available as an action node in Workflow Automations, enabling automated BGV triggers, email sends, and more." },
+              ]}
+              tips={[
+                "Connect Slack to get real-time hiring notifications without checking the dashboard.",
+                "BGV integrations (AuthBridge, Checkr, IDfy) unlock automatic background check triggers in workflows.",
+                "You can disconnect and reconnect at any time — previous runs are unaffected.",
+              ]}
+            />
             {/* Connect Modal */}
             <Dialog open={!!connectTarget} onOpenChange={() => setConnectTarget(null)}>
                 <DialogContent className="max-w-md">

@@ -3,6 +3,7 @@ import api from '../api/client';
 import { Button } from '@/components/ui/button';
 import { TrendingUp, Clock, AlertTriangle, Brain, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PageGuide } from '@/components/PageGuide';
 
 type Tab = 'offer' | 'ttf' | 'retention' | 'weights';
 
@@ -107,6 +108,21 @@ export default function Predictions() {
 
     return (
         <div className="space-y-6 max-w-3xl">
+            <PageGuide
+              pageKey="predictions"
+              title="How AI Predictions Work"
+              steps={[
+                { title: "Offer Acceptance", description: "Enter the candidate's offer details and market benchmarks. The model predicts the probability they'll accept, based on compensation gap, days-in-process, and historical patterns." },
+                { title: "Time to Fill", description: "Provide the role title, department, location, and required experience. The model estimates how many days this requisition will take to fill based on similar past roles." },
+                { title: "Retention Risk", description: "Enter an employee's tenure, performance, recent promotions, and team changes. The model flags high-risk employees before they resign." },
+                { title: "AI Weights", description: "View the current model feature weights to understand which factors have the most influence on each prediction. Weights update automatically as outcomes are recorded." },
+              ]}
+              tips={[
+                "Predictions improve over time — the more outcomes you record, the more accurate the model becomes.",
+                "Use Retention Risk in quarterly reviews to proactively address flight risks.",
+                "Time-to-Fill predictions help you set realistic expectations with hiring managers.",
+              ]}
+            />
             <div>
                 <h1 className="text-2xl font-black tracking-tight">AI Predictions</h1>
                 <p className="text-sm text-muted-foreground mt-1">LLM-powered predictive intelligence for hiring decisions</p>

@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Search, UserPlus, RefreshCw, Tag, StickyNote } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PageGuide } from '@/components/PageGuide';
 
 const SOURCE_COLORS: Record<string, string> = {
     applied: 'bg-blue-100 text-blue-700',
@@ -82,6 +83,22 @@ export default function TalentPool() {
     };
 
     return (
+        <div className="space-y-4">
+            <PageGuide
+              pageKey="talent-pool"
+              title="How the Talent Pool Works"
+              steps={[
+                { title: "Add candidates", description: "Click 'Add to Pool' to manually add sourced, referred, or silver-medalist candidates. You can also bulk import from a previous ATS export." },
+                { title: "Semantic search", description: "The search bar uses AI embeddings — type 'senior React engineer in Bangalore' and it finds semantically similar profiles, not just keyword matches." },
+                { title: "Tag and nurture", description: "Add tags (e.g. 'strong culture fit', 'revisit Q3') and notes to any profile. Tagged candidates can be enrolled in nurture sequences from the Outreach section." },
+                { title: "Re-engage over time", description: "Filter by source (referred, sourced, applied) to find warm candidates for new openings without re-posting or paying job board fees." },
+              ]}
+              tips={[
+                "Add a note immediately after a conversation — context fades fast.",
+                "Tags are searchable — use consistent naming (e.g. 'senior', 'mid', 'junior') for better filtering.",
+                "Silver medalists (2nd-place finishers) close 3× faster than cold sourced candidates.",
+              ]}
+            />
         <div className="flex gap-6 h-[calc(100vh-200px)]">
             {/* Left: List */}
             <div className="flex-1 min-w-0 space-y-4 overflow-y-auto pr-1">
@@ -244,6 +261,7 @@ export default function TalentPool() {
                     </div>
                 </div>
             )}
+        </div>
         </div>
     );
 }
