@@ -2,7 +2,7 @@ import { Queue, Worker, Job } from 'bullmq';
 import { Redis } from 'ioredis';
 import { NotificationService } from './notificationService';
 import { getMongoDb } from '../utils/mongoClient';
-import { AutomationEngine } from './automationEngine';
+import { WorkflowEngine } from './workflow/workflowEngine';
 
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
@@ -64,7 +64,7 @@ export function initializeWorkflow() {
                 }
 
                 // 2. Dynamic Automations (Phase 4)
-                await AutomationEngine.executeWorkflow(tenantId, type, payload);
+                await WorkflowEngine.execute(tenantId, type, payload);
 
             } catch (error) {
                 console.error(`[WorkflowWorker] Error processing job ${job.id}:`, error);
