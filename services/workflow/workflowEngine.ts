@@ -1,5 +1,9 @@
 import { Collection, ObjectId } from "mongodb";
 import { getMongoDb } from "../../utils/mongoClient";
+import { sendEmailAction } from "./actions/sendEmail";
+import { updateStageAction } from "./actions/updateStage";
+import { triggerBgvAction } from "./actions/triggerBgv";
+import { publishJobAction } from "./actions/publishJob";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -334,3 +338,9 @@ export class WorkflowEngine {
     }
   }
 }
+
+// ─── Register action handlers (module side-effect) ────────────────────────────
+registerActionHandler("send_email", sendEmailAction);
+registerActionHandler("update_stage", updateStageAction);
+registerActionHandler("trigger_bgv", triggerBgvAction);
+registerActionHandler("publish_job", publishJobAction);
