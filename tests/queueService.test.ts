@@ -39,5 +39,7 @@ describe("enqueueDelayedResume", () => {
     expect(jobName).toBe("resume");
     expect(jobData).toEqual({ runId: "run-abc", workflowId: "wf-xyz", afterNodeId: "node-1" });
     expect(opts.delay).toBe(5000);
+    expect(opts.attempts).toBe(3);
+    expect(opts.backoff).toEqual({ type: "exponential", delay: 2000 });
   });
 });
