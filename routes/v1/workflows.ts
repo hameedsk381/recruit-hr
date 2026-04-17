@@ -11,20 +11,22 @@ export async function listWorkflowsHandler(req: Request, context: AuthContext) {
 }
 
 export async function createWorkflowHandler(req: Request, context: AuthContext) {
-    if (!context.roles.includes(ROLES.ADMIN)) {
-        return new Response(JSON.stringify({ success: false, error: "Unauthorized" }), { status: 403 });
+    const body = await req.json();
+
+    if (!body.name || !body.trigger) {
+        return new Response(JSON.stringify({ success: false, error: "name and trigger are required" }), { status: 400 });
     }
 
-    const body = await req.json();
     const db = getMongoDb();
-    
+
     const workflow = {
         tenantId: context.tenantId,
         name: body.name,
         trigger: body.trigger,
         nodes: body.nodes || [],
         edges: body.edges || [],
-        isActive: body.isActive !== false,
+        isActive: false,
+        version: 1,
         createdAt: new Date(),
         updatedAt: new Date()
     };

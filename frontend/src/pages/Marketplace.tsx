@@ -60,7 +60,7 @@ export default function Marketplace() {
         try {
             const res = await fetch('/v1/integrations', {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
                     'x-tenant-id': localStorage.getItem('tenantId') || '',
                 },
             });
@@ -86,7 +86,7 @@ export default function Marketplace() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
                     'x-tenant-id': localStorage.getItem('tenantId') || '',
                 },
                 body: JSON.stringify({ credentials }),
@@ -113,7 +113,7 @@ export default function Marketplace() {
             const res = await fetch(`/v1/integrations/${disconnectTarget.id}`, {
                 method: 'DELETE',
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
                     'x-tenant-id': localStorage.getItem('tenantId') || '',
                 },
             });

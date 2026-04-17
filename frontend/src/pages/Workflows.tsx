@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 const API_BASE = '/v1';
 const getHeaders = () => ({
   'Content-Type': 'application/json',
-  'Authorization': `Bearer ${localStorage.getItem('token')}`,
+  'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
   'x-tenant-id': localStorage.getItem('tenantId') || '',
 });
 
@@ -156,9 +156,11 @@ export default function Workflows() {
         setNewName('');
         setNewTrigger('');
         await loadWorkflows();
+      } else {
+        alert(`Failed to create workflow: ${data.error || 'Unknown error'}`);
       }
-    } catch (e) {
-      console.error('Create failed', e);
+    } catch (e: any) {
+      alert(`Failed to create workflow: ${e.message || 'Network error'}`);
     } finally {
       setIsCreating(false);
     }
