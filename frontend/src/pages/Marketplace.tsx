@@ -3,124 +3,203 @@ import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { 
+import {
+    Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
+} from "@/components/ui/dialog";
+import {
     LayoutGrid, Search, Zap, ExternalLink, Plus,
     ArrowRight, Star, Key, Copy, Trash2, RefreshCw,
-    Code, Book, Rocket
+    Code, Book, Rocket, Loader2, X
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import api from '../api/client';
 
-// Simple toast mock since sonner is not installed
 const toast = {
     success: (msg: string) => alert(`Success: ${msg}`),
     error: (msg: string) => alert(`Error: ${msg}`)
 };
 
+interface CredentialField {
+    key: string;
+    label: string;
+    type: "text" | "password" | "url";
+    required: boolean;
+    placeholder?: string;
+}
+
 interface Integration {
     id: string;
     name: string;
     description: string;
-    category: 'ATS' | 'HRIS' | 'Communication' | 'BGV' | 'E-Sign' | 'Calendar' | 'Other';
-    logo: string;
-    status: 'connected' | 'not_connected' | 'coming_soon';
-    features: string[];
-    rating: number;
-    popular?: boolean;
+    category: 'ATS' | 'HRIS' | 'Communication' | 'BGV' | 'E-Sign' | 'Calendar' | 'Assessment' | 'Other';
+    docsUrl: string;
+    credentialFields: CredentialField[];
+    status: 'connected' | 'not_connected';
+    connectedAt?: string;
 }
 
-const INTEGRATIONS: Integration[] = [
-    {
-        id: 'linkedin',
-        name: 'LinkedIn Jobs',
-        description: 'Post jobs directly and sync applicants in real-time.',
-        category: 'ATS',
-        logo: 'https://cdn-icons-png.flaticon.com/512/174/174857.png',
-        status: 'connected',
-        features: ['One-click post', 'Applicant sync', 'Company page integration'],
-        rating: 4.8,
-        popular: true
-    },
-    {
-        id: 'docusign',
-        name: 'DocuSign',
-        description: 'Send offer letters for legally binding electronic signatures.',
-        category: 'E-Sign',
-        logo: 'https://cdn-icons-png.flaticon.com/512/5968/5968846.png',
-        status: 'connected',
-        features: ['Template binding', 'Real-time status', 'Automated reminders'],
-        rating: 4.9,
-        popular: true
-    },
-    {
-        id: 'authbridge',
-        name: 'AuthBridge',
-        description: 'India\'s leading background verification and identity service.',
-        category: 'BGV',
-        logo: 'https://authbridge.com/wp-content/uploads/2021/04/Authbridge-logo.png',
-        status: 'not_connected',
-        features: ['Identity check', 'Criminal records', 'Education verification'],
-        rating: 4.7
-    },
-    {
-        id: 'slack',
-        name: 'Slack',
-        description: 'Get notified of new matches and interview approvals.',
-        category: 'Communication',
-        logo: 'https://cdn-icons-png.flaticon.com/512/3800/3800024.png',
-        status: 'not_connected',
-        features: ['Team notifications', 'Slash commands', 'Approval flow'],
-        rating: 4.8,
-        popular: true
-    },
-    {
-        id: 'google-calendar',
-        name: 'Google Calendar',
-        description: 'Sync interview schedules and check interviewer availability.',
-        category: 'Calendar',
-        logo: 'https://cdn-icons-png.flaticon.com/512/2991/2991147.png',
-        status: 'connected',
-        features: ['Availability sync', 'Room booking', 'Invite automation'],
-        rating: 4.9
-    },
-    {
-        id: 'workday',
-        name: 'Workday',
-        description: 'Sync hire data and employee profiles with your primary HRIS.',
-        category: 'HRIS',
-        logo: 'https://cdn-icons-png.flaticon.com/512/5969/5969248.png',
-        status: 'not_connected',
-        features: ['Employee import', 'Hire export', 'Department sync'],
-        rating: 4.6
-    },
-    {
-        id: 'hackerrank',
-        name: 'HackerRank',
-        description: 'Send automated coding assessments to engineering candidates.',
-        category: 'Other',
-        logo: 'https://cdn-icons-png.flaticon.com/512/919/919830.png',
-        status: 'coming_soon',
-        features: ['Coding tests', 'Auto-scoring', 'Anti-plagiarism'],
-        rating: 4.8
-    }
-];
-
-const CATEGORIES = ['All', 'ATS', 'HRIS', 'Communication', 'BGV', 'E-Sign', 'Calendar', 'Other'];
+const CATEGORIES = ['All', 'ATS', 'HRIS', 'Communication', 'BGV', 'E-Sign', 'Calendar', 'Assessment', 'Other'];
 
 export default function Marketplace() {
     const [viewMode, setViewMode] = useState<'explore' | 'developers'>('explore');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('All');
+    const [integrations, setIntegrations] = useState<Integration[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [connectTarget, setConnectTarget] = useState<Integration | null>(null);
+    const [disconnectTarget, setDisconnectTarget] = useState<Integration | null>(null);
+    const [credentials, setCredentials] = useState<Record<string, string>>({});
+    const [isSaving, setIsSaving] = useState(false);
 
-    const filteredIntegrations = INTEGRATIONS.filter(item => {
-        const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                             item.description.toLowerCase().includes(searchQuery.toLowerCase());
+    useEffect(() => {
+        loadIntegrations();
+    }, []);
+
+    const loadIntegrations = async () => {
+        setIsLoading(true);
+        try {
+            const res = await fetch('/v1/integrations', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'x-tenant-id': localStorage.getItem('tenantId') || '',
+                },
+            });
+            const data = await res.json();
+            if (data.success) setIntegrations(data.integrations);
+        } catch (e) {
+            console.error('Failed to load integrations', e);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const openConnectModal = (integration: Integration) => {
+        setConnectTarget(integration);
+        setCredentials({});
+    };
+
+    const handleConnect = async () => {
+        if (!connectTarget) return;
+        setIsSaving(true);
+        try {
+            const res = await fetch(`/v1/integrations/${connectTarget.id}/connect`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'x-tenant-id': localStorage.getItem('tenantId') || '',
+                },
+                body: JSON.stringify({ credentials }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast.success(`${connectTarget.name} connected successfully`);
+                setConnectTarget(null);
+                await loadIntegrations();
+            } else {
+                toast.error(data.error || 'Failed to connect');
+            }
+        } catch (e: any) {
+            toast.error(e.message || 'Connection failed');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleDisconnect = async () => {
+        if (!disconnectTarget) return;
+        setIsSaving(true);
+        try {
+            const res = await fetch(`/v1/integrations/${disconnectTarget.id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'x-tenant-id': localStorage.getItem('tenantId') || '',
+                },
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast.success(`${disconnectTarget.name} disconnected`);
+                setDisconnectTarget(null);
+                await loadIntegrations();
+            } else {
+                toast.error(data.error || 'Failed to disconnect');
+            }
+        } catch (e: any) {
+            toast.error(e.message || 'Disconnect failed');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const filteredIntegrations = integrations.filter(item => {
+        const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            item.description.toLowerCase().includes(searchQuery.toLowerCase());
         const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
         return matchesSearch && matchesCategory;
     });
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+            {/* Connect Modal */}
+            <Dialog open={!!connectTarget} onOpenChange={() => setConnectTarget(null)}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Connect {connectTarget?.name}</DialogTitle>
+                        <DialogDescription>
+                            Enter your credentials. They are encrypted and stored securely.{' '}
+                            {connectTarget?.docsUrl && (
+                                <a href={connectTarget.docsUrl} target="_blank" rel="noreferrer" className="underline text-primary">
+                                    Where do I find these?
+                                </a>
+                            )}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        {connectTarget?.credentialFields.map(field => (
+                            <div key={field.key} className="space-y-1.5">
+                                <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                                    {field.label}{field.required && <span className="text-destructive ml-1">*</span>}
+                                </label>
+                                <Input
+                                    type={field.type === 'password' ? 'password' : 'text'}
+                                    placeholder={field.placeholder}
+                                    value={credentials[field.key] || ''}
+                                    onChange={e => setCredentials(prev => ({ ...prev, [field.key]: e.target.value }))}
+                                    className="font-mono text-sm"
+                                />
+                            </div>
+                        ))}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="ghost" onClick={() => setConnectTarget(null)}>Cancel</Button>
+                        <Button onClick={handleConnect} disabled={isSaving}>
+                            {isSaving ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
+                            Connect
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Disconnect Confirmation */}
+            <Dialog open={!!disconnectTarget} onOpenChange={() => setDisconnectTarget(null)}>
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>Disconnect {disconnectTarget?.name}?</DialogTitle>
+                        <DialogDescription>
+                            This will remove the stored credentials. Any active workflows using this integration will stop working.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="ghost" onClick={() => setDisconnectTarget(null)}>Cancel</Button>
+                        <Button variant="destructive" onClick={handleDisconnect} disabled={isSaving}>
+                            {isSaving ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
+                            Disconnect
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             {/* Header with Toggle */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div className="space-y-2">
@@ -132,9 +211,9 @@ export default function Marketplace() {
                         Power up your recruitment stack with native integrations and developer tools.
                     </p>
                 </div>
-                
+
                 <div className="flex bg-muted p-1 rounded-xl border border-border/50">
-                    <button 
+                    <button
                         onClick={() => setViewMode('explore')}
                         className={cn(
                             "px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all",
@@ -143,7 +222,7 @@ export default function Marketplace() {
                     >
                         Marketplace
                     </button>
-                    <button 
+                    <button
                         onClick={() => setViewMode('developers')}
                         className={cn(
                             "px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all",
@@ -161,8 +240,8 @@ export default function Marketplace() {
                     <div className="flex flex-wrap items-center gap-4">
                         <div className="relative flex-1 min-w-[300px] max-w-md">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                            <Input 
-                                placeholder="Search integrations..." 
+                            <Input
+                                placeholder="Search integrations..."
                                 className="pl-10 h-11 bg-card border-border/50 focus-visible:ring-primary shadow-sm font-medium"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -175,8 +254,8 @@ export default function Marketplace() {
                                     onClick={() => setSelectedCategory(cat)}
                                     className={cn(
                                         "px-4 py-1.5 rounded-md text-xs font-bold uppercase tracking-widest transition-all",
-                                        selectedCategory === cat 
-                                            ? "bg-primary text-primary-foreground shadow-sm" 
+                                        selectedCategory === cat
+                                            ? "bg-primary text-primary-foreground shadow-sm"
                                             : "text-muted-foreground hover:text-foreground"
                                     )}
                                 >
@@ -186,82 +265,56 @@ export default function Marketplace() {
                         </div>
                     </div>
 
-                    {/* Featured Section */}
-                    {selectedCategory === 'All' && !searchQuery && (
+                    {isLoading ? (
+                        <div className="flex items-center justify-center py-24 text-muted-foreground">
+                            <Loader2 className="size-6 animate-spin mr-3" />
+                            Loading integrations...
+                        </div>
+                    ) : (
                         <div className="space-y-6">
-                            <div className="flex items-center justify-between">
-                                <h2 className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Featured Ecosystem</h2>
-                                <Button variant="link" className="text-xs font-bold uppercase tracking-widest gap-2">
-                                    Browse All <ArrowRight className="size-3" />
-                                </Button>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {INTEGRATIONS.filter(i => i.popular).map(item => (
-                                    <div key={item.id} className="group vercel-card bg-card border-border/50 hover:border-primary/50 transition-all cursor-pointer overflow-hidden">
-                                        <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                                            <Zap className="size-20" />
+                            <h2 className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">
+                                {searchQuery ? `Search Results (${filteredIntegrations.length})` : `All Integrations (${filteredIntegrations.length})`}
+                            </h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {filteredIntegrations.map(item => (
+                                    <div key={item.id} className="flex items-center gap-4 p-4 rounded-xl border border-border/50 bg-card hover:bg-muted/30 transition-colors group">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 mb-0.5">
+                                                <h3 className="font-bold text-sm text-foreground truncate">{item.name}</h3>
+                                                <Badge variant="outline" className="text-[8px] font-black uppercase px-2 h-4 border-muted-foreground/30 text-muted-foreground">{item.category}</Badge>
+                                                {item.status === 'connected' && (
+                                                    <Badge className="text-[8px] font-black uppercase px-2 h-4 border-none bg-emerald-500/10 text-emerald-500">Connected</Badge>
+                                                )}
+                                            </div>
+                                            <p className="text-[11px] text-muted-foreground font-medium line-clamp-1">{item.description}</p>
                                         </div>
-                                        <div className="flex items-start gap-4 mb-4 relative z-10">
-                                            <div className="size-12 rounded-lg bg-muted flex items-center justify-center p-2 group-hover:scale-110 transition-transform">
-                                                <img src={item.logo} alt="" className="size-full object-contain grayscale group-hover:grayscale-0 transition-all" />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <div className="flex items-center gap-2">
-                                                    <h3 className="font-bold text-foreground leading-none">{item.name}</h3>
-                                                    {item.status === 'connected' && <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-500 border-none text-[8px] font-black uppercase px-2 h-4">Connected</Badge>}
-                                                </div>
-                                                <p className="text-xs text-muted-foreground font-medium">{item.category}</p>
-                                            </div>
-                                        </div>
-                                        <p className="text-xs text-muted-foreground font-medium mb-6 line-clamp-2 relative z-10 leading-relaxed">
-                                            {item.description}
-                                        </p>
-                                        <div className="flex items-center justify-between mt-auto relative z-10">
-                                            <div className="flex items-center gap-1 text-[10px] font-bold text-amber-500">
-                                                <Star className="size-3 fill-current" />
-                                                {item.rating}
-                                            </div>
-                                            <Button size="sm" variant={item.status === 'connected' ? 'outline' : 'default'} className="h-8 text-[10px] font-black uppercase tracking-widest px-4">
-                                                {item.status === 'connected' ? 'Manage' : 'Connect'}
-                                            </Button>
+                                        <div className="shrink-0 flex items-center gap-2">
+                                            {item.status === 'connected' ? (
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="h-8 text-[10px] font-black uppercase tracking-widest px-3 text-destructive border-destructive/30 hover:bg-destructive/10"
+                                                    onClick={() => setDisconnectTarget(item)}
+                                                >
+                                                    <X className="size-3 mr-1" />
+                                                    Disconnect
+                                                </Button>
+                                            ) : (
+                                                <Button
+                                                    size="sm"
+                                                    className="h-8 text-[10px] font-black uppercase tracking-widest px-3"
+                                                    onClick={() => openConnectModal(item)}
+                                                >
+                                                    <Plus className="size-3 mr-1" />
+                                                    Connect
+                                                </Button>
+                                            )}
                                         </div>
                                     </div>
                                 ))}
                             </div>
                         </div>
                     )}
-
-                    {/* List Section */}
-                    <div className="space-y-6">
-                        <h2 className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">
-                            {searchQuery ? `Search Results (${filteredIntegrations.length})` : 'All Integrations'}
-                        </h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {filteredIntegrations.map(item => (
-                                <div key={item.id} className="flex items-center gap-4 p-4 rounded-xl border border-border/50 bg-card hover:bg-muted/30 transition-colors group">
-                                    <div className="size-14 rounded-xl bg-muted flex items-center justify-center p-3 shrink-0">
-                                        <img src={item.logo} alt="" className="size-full object-contain grayscale group-hover:grayscale-0 transition-all opacity-80 group-hover:opacity-100" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-0.5">
-                                            <h3 className="font-bold text-sm text-foreground truncate">{item.name}</h3>
-                                            <Badge variant="outline" className="text-[8px] font-black uppercase px-2 h-4 border-muted-foreground/30 text-muted-foreground">{item.category}</Badge>
-                                        </div>
-                                        <p className="text-[11px] text-muted-foreground font-medium line-clamp-1">{item.description}</p>
-                                    </div>
-                                    <div className="shrink-0 flex items-center gap-2">
-                                        {item.status === 'coming_soon' ? (
-                                            <span className="text-[10px] font-black text-muted-foreground/50 uppercase tracking-widest px-2">Soon</span>
-                                        ) : (
-                                            <Button size="icon" variant="ghost" className="size-8 rounded-full hover:bg-primary hover:text-primary-foreground">
-                                                <Plus className="size-4" />
-                                            </Button>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
                 </div>
             ) : (
                 <DevelopersSection />
@@ -347,13 +400,13 @@ function DevelopersSection() {
 
                         <div className="space-y-6">
                             <div className="flex gap-3">
-                                <Input 
-                                    placeholder="Key description (e.g. My Website Bot)" 
+                                <Input
+                                    placeholder="Key description (e.g. My Website Bot)"
                                     className="h-10 bg-muted/50 border-border/50 font-medium"
                                     value={newKeyName}
                                     onChange={(e) => setNewKeyName(e.target.value)}
                                 />
-                                <Button 
+                                <Button
                                     className="h-10 px-6 font-black uppercase tracking-widest shrink-0"
                                     onClick={handleCreateKey}
                                     disabled={isCreating || !newKeyName}
@@ -413,9 +466,9 @@ function DevelopersSection() {
                                                         )}
                                                     </div>
                                                 </div>
-                                                <Button 
-                                                    size="icon" 
-                                                    variant="ghost" 
+                                                <Button
+                                                    size="icon"
+                                                    variant="ghost"
                                                     className="size-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                                                     onClick={() => handleRevokeKey(key._id)}
                                                 >
