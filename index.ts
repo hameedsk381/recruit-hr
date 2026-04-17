@@ -107,7 +107,8 @@ import {
   initiateBGVHandler, getBGVHandler, bgvWebhookHandler, decideBGVHandler
 } from "./routes/v1/bgv";
 import {
-  listWorkflowsHandler, createWorkflowHandler, updateWorkflowHandler, deleteWorkflowHandler
+  listWorkflowsHandler, createWorkflowHandler, updateWorkflowHandler, deleteWorkflowHandler,
+  activateWorkflowHandler, getWorkflowHistoryHandler, getWorkflowRunHandler
 } from "./routes/v1/workflows";
 import { generateReportHandler } from "./routes/v1/reports";
 import {
@@ -864,6 +865,12 @@ async function startServer() {
                 const r = await deleteWorkflowHandler(req, context, workflowMatch[1]); logRequest(req, startTime, r.status); return finalHandler(r);
             }
           }
+          if (req.method === "POST" && normalizedPath.match(/^\/workflows\/[^/]+\/activate$/))
+            return finalHandler(await activateWorkflowHandler(req, context));
+          if (req.method === "GET" && normalizedPath.match(/^\/workflows\/[^/]+\/history$/))
+            return finalHandler(await getWorkflowHistoryHandler(req, context));
+          if (req.method === "GET" && normalizedPath.match(/^\/workflows\/runs\/[^/]+$/))
+            return finalHandler(await getWorkflowRunHandler(req, context));
 
           if (req.method === "POST" && normalizedPath === "/reports/generate") {
             const r = await generateReportHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);

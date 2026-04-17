@@ -23,10 +23,7 @@ const createRedisConnection = () => {
     }) as any;
 };
 
-export type WorkflowEventType = 
-    | 'CANDIDATE_SHORTLISTED' 
-    | 'HM_DECISION_FINALIZED' 
-    | 'INTERVIEW_CONFIRMED';
+export type WorkflowEventType = string;
 
 export interface WorkflowEvent {
     type: WorkflowEventType;
