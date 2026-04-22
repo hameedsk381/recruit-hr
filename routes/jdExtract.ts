@@ -66,6 +66,26 @@ export async function jdExtractHandler(req: Request): Promise<Response> {
     const buffer = await file.arrayBuffer();
     const jdData = await extractJobDescriptionData(Buffer.from(buffer));
     
+    // Cross-verify with heuristic validator to prevent LLM bypass
+    const { validateJobDescription } = await import('../services/jdValidator');
+    const validation = validateJobDescription(jdData);
+    
+    console.log(`[JDExtractHandler] Validation: type=${validation.documentType}, score=${validation.suitabilityScore}, isValid=${validation.isValid}`);
+    
+    if (validation.documentType === 'resume') {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'DOCUMENT_IS_RESUME',
+          message: 'The uploaded document appears to be a candidate resume, not a job description.'
+        }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true, 

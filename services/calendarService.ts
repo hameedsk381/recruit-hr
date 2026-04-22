@@ -7,7 +7,7 @@ const COLLECTION_NAME = 'availability';
 const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID || 'mock_client_id',
     process.env.GOOGLE_CLIENT_SECRET || 'mock_client_secret',
-    process.env.GOOGLE_REDIRECT_URL || 'http://localhost:3001/auth/google/callback'
+    process.env.GOOGLE_REDIRECT_URL || 'http://localhost:3005/auth/google/callback'
 );
 
 export interface TimeSlot {
@@ -40,7 +40,7 @@ export class CalendarService {
         try {
             oauth2Client.setCredentials({ refresh_token: record.refresh_token });
             const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
-            
+
             const res = await calendar.freebusy.query({
                 requestBody: {
                     timeMin: startDate.toISOString(),
@@ -50,7 +50,7 @@ export class CalendarService {
             });
 
             const busySlots = res.data.calendars?.primary?.busy || [];
-            
+
             // In a real sophisticated system, we would calculate free slots by subtracting busySlots from working hours.
             // For now, we'll return a mock list of free slots, filtering out if they overlap with busySlots.
             const potentialSlots = this.getMockAvailability(startDate);
@@ -125,7 +125,7 @@ export class CalendarService {
                 try {
                     oauth2Client.setCredentials({ refresh_token: record.refresh_token });
                     const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
-                    
+
                     const res = await calendar.events.insert({
                         calendarId: 'primary',
                         sendUpdates: 'all',
@@ -137,7 +137,7 @@ export class CalendarService {
                             attendees: event.attendees.map(email => ({ email }))
                         }
                     });
-                    
+
                     if (res.data.id) {
                         providerEventId = res.data.id;
                         realGoogleEventCreated = true;
@@ -185,7 +185,7 @@ export class CalendarService {
         if (authCode) {
             try {
                 const { tokens } = await oauth2Client.getToken(authCode);
-                refresh_token = tokens.refresh_token; 
+                refresh_token = tokens.refresh_token;
             } catch (err) {
                 console.error('[CalendarService] OAuth Token Exchange failed', err);
             }

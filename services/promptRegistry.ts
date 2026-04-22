@@ -79,15 +79,21 @@ Return only the JSON object. Do not include any other text, markdown formatting,
     },
     'JD_EXTRACTION_V1': {
         id: 'jd-extraction',
-        version: '1.0.0',
-        description: 'Extracts structured JSON data from job description text using Groq',
+        version: '1.1.0',
+        description: 'Extracts structured JSON data from job description text. Industry-agnostic.',
         modelConfig: {
             recommendedModel: 'llama-3-8b-8192',
-            temperature: 0.3,
+            temperature: 0.2,
             maxTokens: 1500
         },
-        template: `You are an expert HR assistant specializing in extracting information from job descriptions.
-Extract the key information from the job description and return ONLY the JSON object in the following format:
+        template: `You are an expert HR assistant specializing in multi-industry talent acquisition.
+Extract key information from the job description and return ONLY the JSON object.
+
+VALIDATION RULES:
+1. If the provided text appears to be a PERSON'S RESUME (e.g., contains personal summaries, work history of one individual, education, etc.) instead of a Job Description, return: {"error": "DOCUMENT_IS_RESUME", "message": "This appears to be a candidate resume. Please upload a Job Description."}
+2. Be industry-agnostic. Whether it's healthcare, manufacturing, retail, or software, extract the relevant competencies.
+
+JSON FORMAT:
 {
   "title": "Job title",
   "company": "Company name",
@@ -95,86 +101,59 @@ Extract the key information from the job description and return ONLY the JSON ob
   "salary": "Salary range or compensation details",
   "requirements": ["List of job requirements"],
   "responsibilities": ["List of job responsibilities"],
-  "skills": ["List of required skills"],
+  "skills": ["List of required skills/competencies"],
   "industrialExperience": ["List of required industrial experience"],
   "domainExperience": ["List of required domain experience"],
-  "requiredIndustrialExperienceYears": "Required years of industrial experience as a number (e.g., if the job requires 3-5 years, use 3 as the minimum)",
-  "requiredDomainExperienceYears": "Required years of domain experience as a number",
-  "employmentType": "Type of employment (Full-Time, Part-Time, Contract, or Internship)",
-  "department": "Department name if mentioned",
+  "requiredIndustrialExperienceYears": number,
+  "requiredDomainExperienceYears": number,
+  "employmentType": "Full-Time | Part-Time | Contract | Internship",
+  "department": "Department name",
   "description": "Full job description text"
 }
 
-When extracting experience requirements, look for phrases like "years of experience", "minimum experience", "X+ years", etc. If a range is given (e.g., "3-5 years"), use the minimum value. If the requirement is vague (e.g., "experience preferred"), estimate a reasonable number or use 0 if not clearly specified.
-
-For employment type, look for keywords like:
-- Full-Time: "full time", "full-time", "permanent"
-- Part-Time: "part time", "part-time"
-- Contract: "contract", "contractual", "freelance"
-- Internship: "intern", "internship", "trainee"
-
-Return only the JSON object. Do not include any other text, markdown formatting, or explanations.`
+Return ONLY the JSON object. Do not include markdown formatting or explanations.`
     },
     'JOB_MATCHING_V1': {
         id: 'job-matching',
-        version: '1.0.0',
-        description: 'Analyzes match between job description and resume',
+        version: '1.1.0',
+        description: 'Analyzes match between JD and resume. High precision, industry-agnostic.',
         modelConfig: {
             recommendedModel: 'llama-3-8b-8192',
-            temperature: 0.3,
+            temperature: 0.2,
             maxTokens: 1024
         },
-        template: `You are an expert HR consultant specializing in job-resume matching analysis.
-Analyze the provided job description and resume, focusing specifically on ROLE RELEVANCE, SKILLSET MATCHING, and EXPERIENCE QUALITY.
+        template: `You are an expert HR consultant specializing in cross-industry matching.
+Analyze the provided JD and resume. Focus on:
+1. Core Competency Match (Technical or non-technical)
+2. Years of relevant Experience
+3. Domain Relevance (e.g., Pharma, Fintech, Automotive, Software)
+4. Recent Role Quality
 
-CRITICAL EVALUATION CRITERIA:
-1. Role Relevance: How well does the candidate's background align with the job role?
-2. Technical Skills Match: What percentage of required technical skills does the candidate possess?
-3. Experience Level Alignment: Does the candidate have appropriate experience for the role level?
-4. Domain Expertise: Does the candidate have relevant industry/domain experience?
-5. Recent Experience Quality: Focus on the candidate's most recent company experience and its relevance
-6. Experience Threshold Compliance: Does the candidate meet the minimum required years of experience?
+SCORING:
+- 0-59: Poor fit
+- 60-75: Potential fit with gaps
+- 76-100: Strong match
 
-SCORING GUIDELINES:
-- Only provide matches with score >= 60 (below 60 = irrelevant)
-- Score 60-70: Basic relevance with some skill gaps
-- Score 70-85: Good match with minor gaps
-- Score 85-100: Excellent match, highly relevant
-
-EXPERIENCE EVALUATION FOCUS:
-- Pay special attention to the candidate's most recent work experience
-- Evaluate if the required years of domain experience are met or exceeded
-- If the job requires X years of experience, candidates MUST have at least X years
-- Recent relevant experience should be weighted more heavily than older experience
-- For domain-specific skills (e.g., Python), only count experience if it's in the relevant domain
-
-Return a JSON response with this structure:
+Return ONLY a JSON object:
 {
-  "matchScore": <number between 0-100>,
-  "relevantMatch": <boolean - true only if score >= 60>,
-  "roleAlignment": {
-    "score": <number 0-100>,
-    "assessment": "<detailed role relevance assessment>"
-  },
+  "matchScore": <number>,
+  "relevantMatch": <boolean>,
+  "roleAlignment": { "score": <number>, "assessment": "<text>" },
   "skillsetMatch": {
-    "technicalSkillsMatch": <percentage 0-100>,
-    "matchedSkills": ["skill1", "skill2"],
-    "criticalMissingSkills": ["skill3", "skill4"],
-    "skillGapSeverity": "<low/medium/high>"
+    "technicalSkillsMatch": <number>,
+    "matchedSkills": [],
+    "criticalMissingSkills": [],
+    "skillGapSeverity": "low | medium | high"
   },
   "experienceAlignment": {
-    "levelMatch": "<junior/mid/senior>",
-    "yearsMatch": "<assessment>",
-    "relevantExperience": "<assessment>",
-    "domainExperienceMatch": "<evaluation of domain experience requirements>",
-    "recentExperienceMatch": "<evaluation of recent company experience relevance>"
+    "levelMatch": "junior | mid | senior",
+    "yearsMatch": "<text>",
+    "domainExperienceMatch": "<text>"
   },
-  "strengths": ["specific strength1", "specific strength2"],
-  "recommendations": ["specific recommendation1", "specific recommendation2"],
-  "rejectionReason": "<reason if not relevant, null if relevant>"
+  "strengths": ["string"],
+  "recommendations": ["string"],
+  "rejectionReason": "<text | null>"
 }
-
-BE STRICT: Only flag as relevantMatch=true if the candidate genuinely fits the role and has meaningful skill overlap. Pay special attention to experience thresholds - if a job requires X years and the candidate has less than X years, this should significantly impact the score. For domain-specific skills, only count experience if it's in the relevant domain.
 
 {{input_data}}`
     },

@@ -2,6 +2,89 @@ import { getMongoDb } from "../utils/mongoClient";
 import { generateMagicLinkToken, verifyMagicLinkToken } from "../utils/magicLink";
 import { NotificationService } from "../services/notificationService";
 import { ObjectId } from "mongodb";
+import { extractResumeData } from "../services/resumeExtractor";
+import { matchMultipleJDsWithMultipleResumes } from "../services/multipleJobMatcher";
+
+/**
+ * AI Match-First: Analyze resume against all open jobs
+ */
+export async function matchMyResumeHandler(req: Request): Promise<Response> {
+    try {
+        const formData = await req.formData();
+        const tenantId = formData.get("tenantId") as string;
+        const resumeFile = formData.get("resume") as File;
+
+        if (!tenantId || !resumeFile) {
+            return new Response(JSON.stringify({ success: false, error: "Missing tenantId or resume" }), { status: 400 });
+        }
+
+        const db = getMongoDb();
+        if (!db) return new Response(JSON.stringify({ error: "DB Unavailable" }), { status: 503 });
+
+        // 1. Fetch all public jobs (published requisitions) for this tenant
+        const jobs = await db.collection('requisitions')
+            .find({ tenantId, status: 'published' })
+            .toArray();
+
+        if (jobs.length === 0) {
+            return new Response(JSON.stringify({ success: true, matches: [], message: "No open roles found" }), { status: 200 });
+        }
+
+        // 2. Extract Resume Data
+        const resumeBuffer = Buffer.from(await resumeFile.arrayBuffer());
+        const resumeData = await extractResumeData(resumeBuffer, resumeFile.name);
+
+        // 3. Batch Match against all jobs
+        // We construct JD data from requisition fields if full jdData isn't available
+        const jdDataList = jobs.map(j => ({
+            title: j.title,
+            company: j.company || "Enterprise Partner",
+            location: j.location || "Remote",
+            department: j.department || "General",
+            description: j.description || j.justification || "",
+            skills: j.skills || [],
+            salary: j.budgetBand ? `${j.budgetBand.min} - ${j.budgetBand.max} ${j.budgetBand.currency}` : "Not specified",
+            requirements: j.requirements || [],
+            responsibilities: j.responsibilities || [],
+            industrialExperience: j.industrialExperience || [],
+            domainExperience: j.domainExperience || [],
+            requiredIndustrialExperienceYears: j.experience_expectations?.min_years || 0,
+            requiredDomainExperienceYears: 0,
+            employmentType: j.employmentType || "Full-time"
+        }));
+
+        const results = await matchMultipleJDsWithMultipleResumes({
+            jdFiles: [],
+            resumeFiles: [resumeFile],
+            jdDataList,
+            resumeUrls: [resumeFile.name], 
+            tenantId
+        });
+
+        // 4. Map results back to job IDs for the frontend
+        const enhancedMatches = results.map(r => {
+            const job = jobs.find(j => j.title === r.jdTitle);
+            return {
+                jobId: job?._id?.toString() || job?.id,
+                title: r.jdTitle,
+                matchScore: r.matchScore,
+                matchedSkills: r.matchedSkills,
+                summary: r.summary,
+                location: job?.location || "Remote",
+                employmentType: job?.employmentType || "Full-time"
+            };
+        });
+
+        return new Response(JSON.stringify({ 
+            success: true, 
+            matches: enhancedMatches 
+        }), { status: 200 });
+
+    } catch (error) {
+        console.error("[MatchMyResume] Error:", error);
+        return new Response(JSON.stringify({ success: false, error: "Matching failed" }), { status: 500 });
+    }
+}
 
 /**
  * Handle public job application

@@ -804,7 +804,7 @@ grep -E "(error|Error|FAIL|Ready)" /tmp/integration-wire-test.log | head -10
 kill %1 2>/dev/null
 ```
 
-Expected: `[Index] Platform Ready. Serving on port 3001` — no errors.
+Expected: `[Index] Platform Ready. Serving on port 3005` — no errors.
 
 - [ ] **Step 4: Commit**
 
@@ -1202,12 +1202,12 @@ sleep 3
 grep -E "(Ready|Error|error)" /tmp/marketplace-smoke.log
 ```
 
-Expected: `[Index] Platform Ready. Serving on port 3001`
+Expected: `[Index] Platform Ready. Serving on port 3005`
 
 - [ ] **Step 3: Get an auth token (use test credentials)**
 
 ```bash
-TOKEN=$(curl -s -X POST http://localhost:3001/v1/auth/login \
+TOKEN=$(curl -s -X POST http://localhost:3005/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com","password":"password123"}' | \
   bun -e "const d=await Bun.stdin.text();const p=JSON.parse(d);console.log(p.token??p.data?.token??'NO_TOKEN')")
@@ -1217,7 +1217,7 @@ echo "Token: $TOKEN"
 - [ ] **Step 4: Fetch the integrations list**
 
 ```bash
-curl -s http://localhost:3001/v1/integrations \
+curl -s http://localhost:3005/v1/integrations \
   -H "Authorization: Bearer $TOKEN" \
   -H "x-tenant-id: test-tenant" | \
   bun -e "const d=await Bun.stdin.text();const p=JSON.parse(d);console.log('Count:',p.integrations?.length,'Success:',p.success)"
@@ -1228,7 +1228,7 @@ Expected: `Count: 24 Success: true`
 - [ ] **Step 5: Connect an integration**
 
 ```bash
-curl -s -X POST http://localhost:3001/v1/integrations/slack/connect \
+curl -s -X POST http://localhost:3005/v1/integrations/slack/connect \
   -H "Authorization: Bearer $TOKEN" \
   -H "x-tenant-id: test-tenant" \
   -H "Content-Type: application/json" \
@@ -1241,7 +1241,7 @@ Expected: `{"success":true,"integration":{"id":"slack","status":"connected","con
 - [ ] **Step 6: Verify status**
 
 ```bash
-curl -s http://localhost:3001/v1/integrations/slack/status \
+curl -s http://localhost:3005/v1/integrations/slack/status \
   -H "Authorization: Bearer $TOKEN" \
   -H "x-tenant-id: test-tenant" | \
   bun -e "const d=await Bun.stdin.text();console.log(d)"
@@ -1252,7 +1252,7 @@ Expected: `{"success":true,"id":"slack","status":"connected","connectedAt":"..."
 - [ ] **Step 7: Disconnect the integration**
 
 ```bash
-curl -s -X DELETE http://localhost:3001/v1/integrations/slack \
+curl -s -X DELETE http://localhost:3005/v1/integrations/slack \
   -H "Authorization: Bearer $TOKEN" \
   -H "x-tenant-id: test-tenant" | \
   bun -e "const d=await Bun.stdin.text();console.log(d)"
@@ -1263,7 +1263,7 @@ Expected: `{"success":true}`
 - [ ] **Step 8: Stop server and run unit tests**
 
 ```bash
-kill $(lsof -ti:3001) 2>/dev/null
+kill $(lsof -ti:3005) 2>/dev/null
 cd /home/cognitbotz/recruit-hr && bun test tests/integrationService.test.ts 2>&1
 ```
 

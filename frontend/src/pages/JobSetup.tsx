@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import api from '../api/client';
 import type { JobDescription } from '../types';
@@ -13,6 +13,13 @@ import {
     SelectTrigger,
     SelectValue
 } from "@/components/ui/select";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+} from "@/components/ui/dialog";
 import {
     Upload,
     Check,
@@ -37,6 +44,7 @@ export default function JobSetup() {
         setJob, 
         jobLoading, 
         setJobLoading, 
+        jobError,
         setError, 
         setView, 
         setBatchId, 
@@ -51,15 +59,105 @@ export default function JobSetup() {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const resumeInputRef = useRef<HTMLInputElement>(null);
 
+    // ATS Integration State
+    const [showAtsModal, setShowAtsModal] = useState(false);
+    const [isLoadingIntegrations, setIsLoadingIntegrations] = useState(false);
+    const [connectedAts, setConnectedAts] = useState<any[]>([]);
+    const [selectedAts, setSelectedAts] = useState<string | null>(null);
+    const [atsJobs, setAtsJobs] = useState<any[]>([]);
+    const [isLoadingJobs, setIsLoadingJobs] = useState(false);
+
+    // Load connected ATS integrations when modal opens
+    useEffect(() => {
+        const loadIntegrations = async () => {
+            setIsLoadingIntegrations(true);
+            try {
+                const res = await api.listIntegrations() as any;
+                if (res.success) {
+                    const ats = res.integrations.filter((i: any) => i.status === 'connected' && (i.category === 'ATS' || i.category === 'HRIS'));
+                    setConnectedAts(ats);
+                    if (ats.length > 0 && !selectedAts) {
+                        setSelectedAts(ats[0].id);
+                        fetchAtsJobs(ats[0].id);
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to load integrations', e);
+            } finally {
+                setIsLoadingIntegrations(false);
+            }
+        };
+        if (showAtsModal && connectedAts.length === 0) {
+            loadIntegrations();
+        }
+    }, [showAtsModal, connectedAts.length]);
+
+    const fetchAtsJobs = async (id: string) => {
+        setIsLoadingJobs(true);
+        try {
+            const res = await api.listATSJobs(id) as any;
+            if (res.success) setAtsJobs(res.jobs);
+        } catch (e) {
+            console.error('Failed to fetch ATS jobs', e);
+        } finally {
+            setIsLoadingJobs(false);
+        }
+    };
+
+    const handleAtsJobSelect = async (atsJob: any) => {
+        setJobLoading(true);
+        setShowAtsModal(false);
+        try {
+            const result = await api.extractJDText(atsJob.jdText);
+            if (result.success && result.data) {
+                const extractedJob: JobDescription = {
+                    id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15),
+                    title: atsJob.title || result.data.title || 'Untitled Role',
+                    company: atsJob.company || result.data.company || 'Imported from ATS',
+                    core_skills: (result.data.skills || []).map((skill: string, index: number) => ({
+                        skill,
+                        weight: index < 3 ? 'critical' : index < 6 ? 'important' : 'nice_to_have',
+                        mandatory: index < 3,
+                    })),
+                    experience_expectations: {
+                        min_years: result.data.requiredIndustrialExperienceYears || 3,
+                        domain_specific: result.data.domainExperience?.[0] || atsJob.department,
+                    },
+                    role_context: atsJob.jdText,
+                    atsJobId: atsJob.id,
+                    integrationId: selectedAts || undefined,
+                };
+                setJob(extractedJob);
+                setStep('verify-profile');
+            }
+        } catch (err) {
+            console.error('ATS Extraction failed', err);
+            // Fallback if AI fails
+            setJob({
+                id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15),
+                title: atsJob.title,
+                company: 'Imported from ATS',
+                core_skills: [],
+                experience_expectations: { min_years: 3, domain_specific: atsJob.department },
+                role_context: atsJob.jdText,
+                atsJobId: atsJob.id,
+                integrationId: selectedAts || undefined,
+            });
+            setStep('verify-profile');
+        } finally {
+            setJobLoading(false);
+        }
+    };
+
     // Step 1: Process JD
     const processJD = async (file: File) => {
         setJobLoading(true);
         setError('job', null);
         try {
-            const result = await api.extractJD(file);
+            const result = await api.extractJD(file) as any;
             if (result.success && result.data) {
                 const extractedJob: JobDescription = {
-                    id: crypto.randomUUID(),
+                    id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15),
                     title: result.data.title || 'Untitled Role',
                     company: result.data.company || 'New Partner',
                     core_skills: (result.data.skills || []).map((skill: string, index: number) => ({
@@ -76,8 +174,13 @@ export default function JobSetup() {
                 setJob(extractedJob);
                 setStep('verify-profile');
             }
-        } catch (err) {
-            setError('job', 'Analysis failed. Please try a different PDF.');
+        } catch (err: any) {
+            const errorMsg = err.message || '';
+            if (errorMsg.includes('DOCUMENT_IS_RESUME')) {
+                setError('job', 'We detected that you uploaded a Resume instead of a Job Description. Please provide the Job Description to continue.');
+            } else {
+                setError('job', `Analysis failed: ${errorMsg || 'Please try a different PDF.'}`);
+            }
         } finally {
             setJobLoading(false);
         }
@@ -93,6 +196,7 @@ export default function JobSetup() {
                 company: job.company || '',
                 skills: job.core_skills.map(s => s.skill),
                 requiredIndustrialExperienceYears: job.experience_expectations.min_years,
+                industry: job.industry || 'General',
                 description: job.role_context
             };
             const res = await api.match(candidateFiles, jdData);
@@ -167,31 +271,156 @@ export default function JobSetup() {
                         <div className="text-center space-y-3 py-10">
                             <h1 className="text-3xl font-bold tracking-tight text-foreground">Define the Benchmark</h1>
                             <p className="text-sm text-muted-foreground max-w-lg mx-auto">
-                                Upload your technical job description. Our AI will decompose it into granular competencies across India-specific industrial age bands.
+                                Upload your job description or import it directly from your connected ATS. Our AI will decompose it into granular competencies.
                             </p>
                         </div>
 
-                        <div 
-                            className={cn(
-                                "flex flex-col items-center justify-center text-center p-16 rounded-xl border border-dashed transition-all bg-card/50",
-                                dragOver ? "border-foreground bg-muted/50" : "border-border/60 hover:border-foreground/30"
-                            )}
-                            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                            onDragLeave={() => setDragOver(false)}
-                            onDrop={async (e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) await processJD(f); }}
-                        >
-                            <input ref={fileInputRef} type="file" className="hidden" accept=".pdf" onChange={(e) => { const f = e.target.files?.[0]; if (f) processJD(f); }} />
-                            <div className="size-14 rounded-full bg-muted flex items-center justify-center mb-6">
-                                {jobLoading ? <Loader2 size={24} className="animate-spin text-foreground" /> : <Upload size={24} className="text-foreground" />}
+                        {jobError && (
+                            <motion.div 
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="p-4 rounded-xl border-2 border-red-500 bg-red-500/5 text-red-600 flex items-center gap-4 max-w-2xl mx-auto"
+                            >
+                                <div className="size-10 rounded-full bg-red-500/10 flex items-center justify-center shrink-0">
+                                    <ShieldCheck size={20} className="text-red-600" />
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-xs font-black uppercase tracking-widest mb-0.5">Validation Fault</p>
+                                    <p className="text-sm font-medium leading-relaxed">{jobError}</p>
+                                </div>
+                                <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    onClick={() => setError('job', null)}
+                                    className="text-red-600 hover:bg-red-500/10 font-bold text-xs uppercase tracking-widest"
+                                >
+                                    Dismiss
+                                </Button>
+                            </motion.div>
+                        )}
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Upload Card */}
+                            <div 
+                                className={cn(
+                                    "flex flex-col items-center justify-center text-center p-12 rounded-xl border border-dashed transition-all bg-card/50",
+                                    dragOver ? "border-foreground bg-muted/50" : "border-border/60 hover:border-foreground/30"
+                                )}
+                                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                                onDragLeave={() => setDragOver(false)}
+                                onDrop={async (e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) await processJD(f); }}
+                            >
+                                <input ref={fileInputRef} type="file" className="hidden" accept=".pdf" onChange={(e) => { const f = e.target.files?.[0]; if (f) processJD(f); }} />
+                                <div className="size-14 rounded-full bg-muted flex items-center justify-center mb-6">
+                                    {jobLoading ? <Loader2 size={24} className="animate-spin text-foreground" /> : <Upload size={24} className="text-foreground" />}
+                                </div>
+                                <div className="space-y-1.5 mb-8">
+                                    <h3 className="text-base font-semibold text-foreground">Upload Role PDF</h3>
+                                    <p className="text-xs text-muted-foreground font-medium">Standard JD files (Max 10MB)</p>
+                                </div>
+                                <Button className="h-9 px-6 font-medium" onClick={() => fileInputRef.current?.click()} disabled={jobLoading}>
+                                    {jobLoading ? 'Analyzing Blueprint...' : 'Select File'}
+                                </Button>
                             </div>
-                            <div className="space-y-1.5 mb-8">
-                                <h3 className="text-base font-semibold text-foreground">Upload Role PDF</h3>
-                                <p className="text-xs text-muted-foreground">Standard technical JD files accepted (Max 10MB)</p>
+
+                            {/* ATS Import Card */}
+                            <div className="flex flex-col items-center justify-center text-center p-12 rounded-xl border border-dashed border-border/60 hover:border-foreground/30 transition-all bg-card/50 relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 p-3 opacity-10 rotate-12 group-hover:rotate-0 transition-transform">
+                                    <Database size={64} />
+                                </div>
+                                <div className="size-14 rounded-full bg-indigo-500/10 text-indigo-500 flex items-center justify-center mb-6">
+                                    <Database size={24} />
+                                </div>
+                                <div className="space-y-1.5 mb-8">
+                                    <h3 className="text-base font-semibold text-foreground">Import from ATS</h3>
+                                    <p className="text-xs text-muted-foreground font-medium italic">Greenhouse, Workday, Lever...</p>
+                                </div>
+                                <Button variant="outline" className="h-9 px-6 font-medium border-2" onClick={() => setShowAtsModal(true)} disabled={jobLoading}>
+                                    Sync Requisition
+                                </Button>
                             </div>
-                            <Button className="h-9 px-6 font-medium" onClick={() => fileInputRef.current?.click()} disabled={jobLoading}>
-                                {jobLoading ? 'Analyzing Blueprint...' : 'Select File'}
-                            </Button>
                         </div>
+
+                        {/* ATS Import Modal */}
+                        <Dialog open={showAtsModal} onOpenChange={() => setShowAtsModal(false)}>
+                            <DialogContent className="max-w-2xl border-2 border-foreground shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] rounded-none">
+                                <DialogHeader>
+                                    <DialogTitle className="text-xl font-black uppercase tracking-tight">Sync ATS Requisition</DialogTitle>
+                                    <DialogDescription className="font-medium">
+                                        Fetch live job descriptions from your connected platforms.
+                                    </DialogDescription>
+                                </DialogHeader>
+
+                                {isLoadingIntegrations ? (
+                                    <div className="py-12 flex flex-col items-center justify-center gap-4">
+                                        <Loader2 className="size-8 animate-spin text-primary" />
+                                        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Connecting to Ecosystem...</p>
+                                    </div>
+                                ) : connectedAts.length === 0 ? (
+                                    <div className="py-12 text-center space-y-4">
+                                        <div className="size-16 bg-muted rounded-full flex items-center justify-center mx-auto text-muted-foreground">
+                                            <ShieldCheck size={32} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="font-bold">No ATS Connected</p>
+                                            <p className="text-xs text-muted-foreground">Go to the Ecosystem page to connect your ATS.</p>
+                                        </div>
+                                        <Button size="sm" onClick={() => setView('marketplace')} className="font-black border-2">Go to Marketplace</Button>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-6 py-4">
+                                        {/* ATS Selector */}
+                                        <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+                                            {connectedAts.map(ats => (
+                                                <button 
+                                                    key={ats.id}
+                                                    onClick={() => { setSelectedAts(ats.id); setAtsJobs([]); fetchAtsJobs(ats.id); }}
+                                                    className={cn(
+                                                        "px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest border-2 transition-all shrink-0",
+                                                        selectedAts === ats.id ? "bg-foreground text-background border-foreground" : "bg-muted/50 text-muted-foreground border-transparent hover:border-muted-foreground/30"
+                                                    )}
+                                                >
+                                                    {ats.name}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {/* Job List */}
+                                        <div className="max-h-[400px] overflow-y-auto space-y-2 pr-2">
+                                            {isLoadingJobs ? (
+                                                <div className="py-20 text-center animate-pulse">
+                                                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Retrieving active vacancies...</p>
+                                                </div>
+                                            ) : atsJobs.length === 0 ? (
+                                                <div className="py-20 text-center border-2 border-dashed rounded-xl">
+                                                    <p className="text-xs font-bold text-muted-foreground uppercase">No open requisitions found</p>
+                                                </div>
+                                            ) : (
+                                                atsJobs.map(j => (
+                                                    <div 
+                                                        key={j.id} 
+                                                        className="p-4 border-2 border-border/50 hover:border-foreground transition-all group cursor-pointer flex items-center justify-between"
+                                                        onClick={() => handleAtsJobSelect(j)}
+                                                    >
+                                                        <div>
+                                                            <h4 className="font-black text-sm uppercase tracking-tight group-hover:text-primary transition-colors">{j.title}</h4>
+                                                            <div className="flex items-center gap-3 mt-1">
+                                                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{j.department}</span>
+                                                                <span className="size-1 bg-border rounded-full" />
+                                                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{j.location}</span>
+                                                            </div>
+                                                        </div>
+                                                        <Button size="sm" variant="ghost" className="opacity-0 group-hover:opacity-100 transition-opacity font-black text-[10px] uppercase tracking-widest">
+                                                            Select <ChevronRight size={14} className="ml-1" />
+                                                        </Button>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </DialogContent>
+                        </Dialog>
                     </motion.div>
                 )}
 
@@ -204,7 +433,7 @@ export default function JobSetup() {
                     >
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div className="space-y-1">
-                                <h2 className="text-xl font-bold tracking-tight text-foreground">Technical Blueprint</h2>
+                                <h2 className="text-xl font-bold tracking-tight text-foreground">Role Blueprint</h2>
                                 <p className="text-sm text-muted-foreground">Verify and adjust the extracted requirements.</p>
                             </div>
                             <Button className="gap-2 shrink-0" onClick={() => setStep('bulk-resumes')} size="sm">
@@ -223,6 +452,23 @@ export default function JobSetup() {
                                         <div className="space-y-2">
                                             <Label className="text-xs font-semibold text-foreground">Organization</Label>
                                             <Input value={job.company} onChange={(e) => setJob({...job, company: e.target.value})} className="h-9" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-semibold text-foreground">Target Industry</Label>
+                                            <Select value={job.industry || 'general'} onValueChange={(val) => setJob({...job, industry: val})}>
+                                                <SelectTrigger className="h-9 text-xs font-medium">
+                                                    <SelectValue placeholder="Select Industry" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="general">General / Diversified</SelectItem>
+                                                    <SelectItem value="technology">Technology & Software</SelectItem>
+                                                    <SelectItem value="healthcare">Healthcare & Pharma</SelectItem>
+                                                    <SelectItem value="finance">Finance & Banking</SelectItem>
+                                                    <SelectItem value="manufacturing">Manufacturing & Industrial</SelectItem>
+                                                    <SelectItem value="retail">Retail & E-commerce</SelectItem>
+                                                    <SelectItem value="energy">Energy & Utilities</SelectItem>
+                                                </SelectContent>
+                                            </Select>
                                         </div>
                                     </div>
                                     <div className="space-y-3">
@@ -299,7 +545,7 @@ export default function JobSetup() {
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                             <div className="space-y-1">
                                 <h2 className="text-xl font-bold tracking-tight text-foreground">Resource Pipeline</h2>
-                                <p className="text-sm text-muted-foreground">Upload candidates to process against the technical blueprint.</p>
+                                <p className="text-sm text-muted-foreground">Upload candidates to process against the role blueprint.</p>
                             </div>
                             <div className="flex gap-3">
                                 <Button variant="outline" size="sm" onClick={() => setStep('verify-profile')}>Back</Button>
@@ -389,6 +635,16 @@ export default function JobSetup() {
                                 <div className="text-right space-y-1">
                                     <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Organization</p>
                                     <p className="font-semibold text-sm">{job.company}</p>
+                                </div>
+                            </div>
+                            <div className="p-5 flex justify-between items-center bg-card">
+                                <div className="space-y-1">
+                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Vertical / Industry</p>
+                                    <p className="font-semibold text-sm capitalize">{job.industry || 'General'}</p>
+                                </div>
+                                <div className="text-right space-y-1">
+                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Target Exp</p>
+                                    <p className="font-semibold text-sm">{job.experience_expectations.min_years}+ Years</p>
                                 </div>
                             </div>
                             <div className="p-5 flex justify-between items-center bg-card">

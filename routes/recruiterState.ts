@@ -66,6 +66,36 @@ export async function getActiveStateHandler(req: Request, context: AuthContext):
 }
 
 /**
+ * Lists all assessment batches for the current user.
+ */
+export async function listBatchesHandler(req: Request, context: AuthContext): Promise<Response> {
+    try {
+        const db = getMongoDb();
+        if (!db) return new Response(JSON.stringify({ error: "DB Unavailable" }), { status: 503 });
+
+        const batches = await db.collection('assessment_batches')
+            .find({ userId: context.userId, tenantId: context.tenantId })
+            .sort({ createdAt: -1 })
+            .project({ batchId: 1, jobData: 1, status: 1, totalJobs: 1, completedJobs: 1, failedJobs: 1, createdAt: 1 })
+            .toArray();
+
+        return new Response(JSON.stringify({
+            success: true,
+            batches: batches.map(b => ({
+                id: b.batchId,
+                title: b.jobData?.title || 'Untitled Role',
+                company: b.jobData?.company || 'N/A',
+                status: b.status,
+                candidateCount: b.totalJobs,
+                createdAt: b.createdAt
+            }))
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+    } catch (error) {
+        return new Response(JSON.stringify({ success: false, error: "Failed to list campaigns" }), { status: 500 });
+    }
+}
+
+/**
  * Updates a candidate's stage or metadata within a batch.
  */
 export async function updateCandidateHandler(req: Request, context: AuthContext): Promise<Response> {
@@ -82,12 +112,19 @@ export async function updateCandidateHandler(req: Request, context: AuthContext)
 
         // Update the specific result within the batch results array
         // We use positional operator $[elem] to find the candidate by name/ID
+        const now = new Date();
         const updateFields: any = {
-            "results.$[elem].stage": stage,
-            "results.$[elem].removed": removed,
-            "results.$[elem].removal_reason": removalReason,
-            "updatedAt": new Date()
+            "updatedAt": now
         };
+
+        if (stage !== undefined) {
+            updateFields["results.$[elem].stage"] = stage;
+            updateFields["results.$[elem].stageChangedAt"] = now;
+        }
+        if (removed !== undefined) {
+            updateFields["results.$[elem].removed"] = removed;
+            updateFields["results.$[elem].removal_reason"] = removalReason;
+        }
 
         if (hmDecision) updateFields["results.$[elem].hmDecision"] = hmDecision;
         if (hmNotes) updateFields["results.$[elem].hmNotes"] = hmNotes;
@@ -130,6 +167,18 @@ export async function updateCandidateHandler(req: Request, context: AuthContext)
                     decision: hmDecision,
                     notes: hmNotes,
                     recruiterEmail: context.email // Notify the initiator/recruiter
+                }
+            });
+        }
+
+        // 3. Trigger for Automated Outreach (Nurture Sequences)
+        if (stage) {
+            await WorkflowService.triggerEvent({
+                type: 'CANDIDATE_STAGE_CHANGED',
+                tenantId: context.tenantId,
+                payload: {
+                    profileId: candidateId,
+                    stage: stage
                 }
             });
         }

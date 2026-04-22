@@ -6,6 +6,8 @@ import { createHash } from "crypto";
 import { createLogger } from "../utils/logger";
 import { processMatrix, processBatch } from "../utils/batchProcessor";
 import { getPrompt, hydratePrompt } from "./promptRegistry";
+import { ToonEncoder } from "../utils/toon";
+import { PIIManager } from "../utils/pii";
 
 export interface MultipleMatchInput {
   jdFiles: File[];
@@ -158,44 +160,46 @@ async function performSingleMatch(jdData: JobDescriptionData, resumeData: Resume
       return cached;
     }
 
-    // Format the experience data for better analysis
-    let formattedExperience = 'Not specified';
-    if (Array.isArray(resumeData.experience) && resumeData.experience.length > 0) {
-      if (typeof resumeData.experience[0] === 'object' && resumeData.experience[0] !== null) {
-        // Format structured experience data
-        formattedExperience = resumeData.experience.map((exp: any, index) => {
-          const role = exp.role || 'Not specified';
-          const company = exp.company || 'Not specified';
-          const duration = exp.duration || 'Not specified';
-          return `${index + 1}. ${role} at ${company} (${duration})`;
-        }).join('\n');
-      } else {
-        // Format string array experience
-        formattedExperience = resumeData.experience.join('\n');
-      }
-    }
+    // Format context data using TOON for token optimization
+    const jobContext = {
+      title: jdData.title,
+      company: jdData.company,
+      requiredSkills: jdData.skills || [],
+      requirements: jdData.requirements || [],
+      industrialExperienceRequired: jdData.requiredIndustrialExperienceYears || 0,
+      domainExperienceRequired: jdData.requiredDomainExperienceYears || 0,
+      industrialExperienceDetails: jdData.industrialExperience || [],
+      domainExperienceDetails: jdData.domainExperience || [],
+      location: jdData.location || 'Not specified'
+    };
+
+    const candidateContext = {
+      name: PIIManager.maskString(resumeData.name || 'Candidate'), // Mask for privacy
+      skills: resumeData.skills || [],
+      experience: Array.isArray(resumeData.experience)
+        ? resumeData.experience.map((e: any) => {
+            if (typeof e === 'object' && e !== null) {
+              return {
+                role: e.role || 'Unknown',
+                company: PIIManager.maskString(e.company || 'Unknown'),
+                duration: e.duration || 'Unknown'
+              };
+            }
+            return { raw: String(e) }; // Fallback for string arrays
+          })
+        : [],
+      education: resumeData.education || [],
+      totalIndustrialExperience: resumeData.totalIndustrialExperienceYears || 0,
+      totalDomainExperience: resumeData.totalDomainExperienceYears || 0,
+      certifications: resumeData.certifications || []
+    };
 
     const promptData = `
-Job Description:
-Title: ${jdData.title}
-Company: ${jdData.company}
-Required Skills: ${jdData.skills?.join(', ') || 'Not specified'}
-Requirements: ${jdData.requirements?.join(', ') || 'Not specified'}
-Industrial Experience Required: ${jdData.requiredIndustrialExperienceYears || 0} years
-Domain Experience Required: ${jdData.requiredDomainExperienceYears || 0} years
-Industrial Experience Details: ${jdData.industrialExperience?.join(', ') || 'Not specified'}
-Domain Experience Details: ${jdData.domainExperience?.join(', ') || 'Not specified'}
-Location: ${jdData.location || 'Not specified'}
+Job Description (TOON format):
+${ToonEncoder.encode(jobContext)}
 
-Resume:
-Name: ${resumeData.name}
-Current Skills: ${resumeData.skills?.join(', ') || 'Not specified'}
-Work Experience: 
-${formattedExperience}
-Education: ${resumeData.education?.join(', ') || 'Not specified'}
-Total Industrial Experience: ${resumeData.totalIndustrialExperienceYears || 0} years
-Total Domain Experience: ${resumeData.totalDomainExperienceYears || 0} years
-Certifications: ${resumeData.certifications?.join(', ') || 'Not specified'}
+Resume (TOON format):
+${ToonEncoder.encode(candidateContext)}
 
 CRITICAL ANALYSIS POINTS:
 1. Does this candidate's background align with the job role and requirements?
@@ -220,10 +224,11 @@ BE STRICT IN YOUR EVALUATION:
     });
 
     const response = await groqChatCompletion(
-      "You are an expert HR consultant specializing in job-resume matching analysis.",
+      "You are an expert HR consultant specializing in job-resume matching analysis. Respond in valid JSON.",
       finalPrompt,
       promptConfig.modelConfig.temperature,
-      promptConfig.modelConfig.maxTokens
+      promptConfig.modelConfig.maxTokens,
+      { type: "json_object" }
     );
 
     // Parse the response

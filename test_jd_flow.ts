@@ -1,6 +1,6 @@
 import { file } from "bun";
 
-const API_BASE = "http://localhost:3001";
+const API_BASE = "http://localhost:3005";
 const JD_FILENAME = "JD_DevOps_Engineer_1753941369483_21481870-1b30-46ba-8fa5-c3cf2d839412.pdf";
 const RESUME_FILENAME = "dummy_resume.txt";
 

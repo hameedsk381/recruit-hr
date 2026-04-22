@@ -31,11 +31,18 @@ import {
     Brain,
     Trash2,
     Activity,
-    Database
+    Database,
+    Mail,
+    Send,
+    AlertCircle,
+    Zap,
+    Sparkles
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { PageGuide } from '@/components/PageGuide';
+import { PipelineHealthService } from '../services/pipelineHealthService';
+import { NurtureService } from '../services/nurtureService';
 
 export default function Shortlist() {
     const {
@@ -63,6 +70,17 @@ export default function Shortlist() {
     });
     const [sortBy, setSortBy] = useState<'rank' | 'name' | 'fit'>('rank');
     const [uploadProgress, setUploadProgress] = useState<{ current: number, total: number } | null>(null);
+    const [outreachModal, setOutreachModal] = useState<{ isOpen: boolean, candidate: ShortlistCandidate | null, type: 'invite' | 'reject' | 'nurture', draft: { subject: string, body: string } | null, isDrafting: boolean }>({
+        isOpen: false,
+        candidate: null,
+        type: 'invite',
+        draft: null,
+        isDrafting: false
+    });
+    const [discussionModal, setDiscussionModal] = useState<{ isOpen: boolean, candidate: ShortlistCandidate | null }>({
+        isOpen: false,
+        candidate: null
+    });
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Shared polling logic
@@ -87,8 +105,8 @@ export default function Shortlist() {
                             assessment: {
                                 one_line_summary: item.matchResult?.summary || 'Candidate Assessment',
                                 fit_assessment: {
-                                    overall_fit: (item.matchResult?.matchScore || 0) >= 80 ? 'high' : (item.matchResult?.matchScore || 0) >= 60 ? 'medium' : 'low',
-                                    reasoning: `Match score: ${item.matchResult?.matchScore}%`,
+                                    overall_fit: (item.matchResult?.matchScore || 0) >= 85 ? 'high' : (item.matchResult?.matchScore || 0) >= 70 ? 'medium' : 'low',
+                                    reasoning: `Suitability score: ${Math.round(Number(item.matchResult?.matchScore) || 0)}%`,
                                 },
                                 strengths: (Array.isArray(item.matchResult?.Analysis?.['Matched Skills']) ? item.matchResult.Analysis['Matched Skills'] : [])
                                     .slice(0, 3)
@@ -99,6 +117,7 @@ export default function Shortlist() {
                                 skill_match_breakdown: [],
                                 interview_focus_areas: Array.isArray(item.matchResult?.Analysis?.Recommendations) ? item.matchResult.Analysis.Recommendations : [],
                                 recruiter_notes: { override_suggestions: '', confidence_level: 'medium' as const },
+                                matchScore: Number(item.matchResult?.matchScore) || 0
                             },
                             rank: index + 1,
                             pinned: false,
@@ -152,6 +171,7 @@ export default function Shortlist() {
                 company: job.company || '',
                 skills: job.core_skills.map(s => s.skill),
                 requiredIndustrialExperienceYears: job.experience_expectations.min_years,
+                industry: (job as any).industry || 'General',
                 description: job.role_context
             };
             const result = await api.match(Array.from(files), jdData);
@@ -171,6 +191,52 @@ export default function Shortlist() {
         removeCandidate(removeModalId, removeReason);
         setRemoveModalId(null);
         setRemoveReason('');
+    };
+
+    const [syncingId, setSyncingId] = useState<string | null>(null);
+
+    const handleSyncToAts = async (candidate: ShortlistCandidate) => {
+        if (!job?.integrationId) return;
+        setSyncingId(candidate.id);
+        try {
+            const atsCandidateId = candidate.profile.atsCandidateId || `mock-ats-${candidate.profile.email}`;
+            
+            const res = await api.pushATSScore(job.integrationId, {
+                atsCandidateId,
+                score: Math.round((candidates.indexOf(candidate) + 1) * 10),
+                summary: candidate.assessment.one_line_summary,
+                jobId: job.atsJobId
+            }) as any;
+
+            if (res.success) {
+                alert(`Successfully synced ${candidate.profile.name} to ${job.integrationId}`);
+            } else {
+                alert(`Failed to sync: ${res.error || 'Unknown error'}`);
+            }
+        } catch (err) {
+            console.error('Sync to ATS failed', err);
+            alert('Failed to sync to ATS. Check your integration connection.');
+        } finally {
+            setSyncingId(null);
+        }
+    };
+
+    const handleDraftOutreach = async (type: 'invite' | 'reject' | 'nurture', candidate: ShortlistCandidate) => {
+        setOutreachModal(prev => ({ ...prev, isOpen: true, candidate, type, isDrafting: true, draft: null }));
+        try {
+            const res = await api.draftOutreach({
+                jobContext: { title: job?.title, company: job?.company },
+                candidateProfile: candidate.profile,
+                assessment: candidate.assessment,
+                type
+            });
+            if (res.success) {
+                setOutreachModal(prev => ({ ...prev, draft: res.draft, isDrafting: false }));
+            }
+        } catch (err) {
+            setError('candidates', 'Failed to draft outreach email.');
+            setOutreachModal(prev => ({ ...prev, isDrafting: false }));
+        }
     };
 
     let visibleCandidates = candidates.filter(c => {
@@ -196,6 +262,29 @@ export default function Shortlist() {
         low: candidates.filter(c => !c.removed && c.assessment.fit_assessment.overall_fit === 'low').length,
     };
 
+    const healthStats = PipelineHealthService.analyze(candidates.filter(c => !c.removed));
+    const advice = PipelineHealthService.getActionableAdvice(healthStats);
+
+    const [nurtureAlerts, setNurtureAlerts] = useState<string[]>([]);
+    
+    useEffect(() => {
+        if (job && candidates.length > 0) {
+            NurtureService.checkAndTriggerNurture(candidates, job).then(setNurtureAlerts);
+        }
+    }, [candidates, job]);
+
+    const handleCancelBatch = async () => {
+        if (!batchId) return;
+        try {
+            await api.cancelBatch(batchId);
+            setCandidatesLoading(false);
+            setUploadProgress(null);
+            setError('candidates', 'Batch processing was cancelled.');
+        } catch (err) {
+            console.error('Failed to cancel batch', err);
+        }
+    };
+
     if (candidates.length === 0 && !candidatesLoading) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 animate-in fade-in duration-500">
@@ -216,18 +305,6 @@ export default function Shortlist() {
             </div>
         );
     }
-
-    const handleCancelBatch = async () => {
-        if (!batchId) return;
-        try {
-            await api.cancelBatch(batchId);
-            setCandidatesLoading(false);
-            setUploadProgress(null);
-            setError('candidates', 'Batch processing was cancelled.');
-        } catch (err) {
-            console.error('Failed to cancel batch', err);
-        }
-    };
 
     if (candidatesLoading) {
         return (
@@ -375,6 +452,39 @@ export default function Shortlist() {
 
                     <div className="p-5 rounded-xl border border-border/50 bg-card space-y-6 shadow-sm">
                         <h4 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                            <Zap size={14} className="text-amber-500" /> Pipeline Health
+                        </h4>
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center">
+                                <span className="text-xs text-muted-foreground">Velocity</span>
+                                <span className="text-xs font-bold text-emerald-600">{healthStats.velocityScore}%</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-xs text-muted-foreground">Bottleneck</span>
+                                <span className="text-xs font-bold capitalize">{healthStats.bottleneckStage}</span>
+                            </div>
+                            {healthStats.staleCandidates > 0 && (
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs text-muted-foreground">Stale Profiles</span>
+                                    <span className="text-xs font-bold text-destructive">{healthStats.staleCandidates}</span>
+                                </div>
+                            )}
+                        </div>
+                        
+                        {advice.length > 0 && (
+                            <div className="pt-4 border-t border-border/40 space-y-3">
+                                {advice.map((item: string, i: number) => (
+                                    <div key={i} className="flex gap-2 p-2 rounded-lg bg-amber-500/5 border border-amber-500/10">
+                                        <AlertCircle size={12} className="text-amber-600 shrink-0 mt-0.5" />
+                                        <p className="text-[10px] leading-tight text-amber-700/80 font-medium">{item}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="p-5 rounded-xl border border-border/50 bg-card space-y-6 shadow-sm">
+                        <h4 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                             <Activity size={14} /> Pipeline Stats
                         </h4>
                         <div className="grid grid-cols-2 gap-3">
@@ -392,6 +502,38 @@ export default function Shortlist() {
 
                 {/* Candidate List */}
                 <main className="lg:col-span-3 space-y-4 pb-12">
+                    {nurtureAlerts.length > 0 && (
+                        <div className="bg-indigo-600/5 border border-indigo-600/20 rounded-2xl p-4 flex gap-4 items-start animate-in slide-in-from-top-4 duration-500">
+                            <div className="size-10 rounded-xl bg-indigo-600/10 flex items-center justify-center text-indigo-600 shrink-0">
+                                <Sparkles size={20} />
+                            </div>
+                            <div className="space-y-1 flex-1">
+                                <h4 className="text-sm font-bold text-indigo-900">Smart Pipeline Alerts</h4>
+                                <div className="space-y-2">
+                                    {nurtureAlerts.map((alert, i) => (
+                                        <p key={i} className="text-xs text-indigo-700/80 font-medium flex items-center gap-2">
+                                            <span className="size-1 bg-indigo-400 rounded-full" />
+                                            {alert}
+                                        </p>
+                                    ))}
+                                </div>
+                            </div>
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-8 text-[10px] font-bold uppercase tracking-widest text-indigo-600 hover:bg-indigo-600/10"
+                                onClick={async (e) => {
+                                    e.stopPropagation();
+                                    const { count } = await NurtureService.generateDrafts(candidates);
+                                    setNurtureAlerts([]); // Clear alerts after action
+                                    alert(`Drafted ${count} outreach emails. You can review them in the Nurture tab.`);
+                                }}
+                            >
+                                Auto-Draft All
+                            </Button>
+                        </div>
+                    )}
+
                     <LayoutGroup>
                         <AnimatePresence mode="popLayout">
                             {visibleCandidates.map((candidate) => (
@@ -411,7 +553,6 @@ export default function Shortlist() {
                                         candidate.assessment.fit_assessment.overall_fit === 'medium' ? "border-l-amber-500" : "border-l-blue-500"
                                     )}>
                                         <div className="flex-1 p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-5 bg-card">
-                                            
                                             <div className="flex-1 min-w-0 space-y-2">
                                                 <div className="flex items-center gap-3">
                                                     <h3 className="text-lg font-bold truncate">{candidate.profile.name}</h3>
@@ -436,8 +577,8 @@ export default function Shortlist() {
                                                 </div>
                                             </div>
                                             
-                                            <div className="flex items-center gap-6 shrink-0 w-full md:w-auto justify-between md:justify-end border-t md:border-none pt-4 md:pt-0 pb-1 md:pb-0 border-border/40 mt-2 md:mt-0">
-                                                <div className="flex flex-col md:items-center w-12">
+                                            <div className="flex items-center gap-8 shrink-0">
+                                                <div className="flex flex-col items-center w-16">
                                                     <div className={cn(
                                                         "text-lg font-bold tabular-nums",
                                                         candidate.assessment.fit_assessment.overall_fit === 'high' ? "text-emerald-600" :
@@ -446,16 +587,36 @@ export default function Shortlist() {
                                                         {candidate.assessment.fit_assessment.overall_fit === 'high' ? 'A+' :
                                                          candidate.assessment.fit_assessment.overall_fit === 'medium' ? 'B' : 'C'}
                                                     </div>
-                                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Match</span>
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                                                        {Math.round(Number(candidate.assessment.matchScore) || 0)}% Match
+                                                    </span>
                                                 </div>
-                                                <div className="flex items-center gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+
+                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <Button variant="ghost" size="icon" className="size-8 text-indigo-600 hover:bg-indigo-50" onClick={(e) => { e.stopPropagation(); handleDraftOutreach('invite', candidate); }}>
+                                                        <Mail size={14} />
+                                                    </Button>
+                                                    {job?.integrationId && (
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="icon" 
+                                                            className={cn("size-8 text-emerald-600 hover:bg-emerald-50", syncingId === candidate.id && "animate-spin")} 
+                                                            onClick={(e) => { e.stopPropagation(); handleSyncToAts(candidate); }}
+                                                            title={`Sync to ${job.integrationId}`}
+                                                        >
+                                                            <Database size={14} />
+                                                        </Button>
+                                                    )}
                                                     <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-foreground" onClick={(e) => { e.stopPropagation(); pinCandidate(candidate.id); }}>
                                                         <Pin size={14} className={cn(candidate.pinned && "fill-foreground")} />
+                                                    </Button>
+                                                    <Button variant="ghost" size="icon" className="size-8 text-indigo-600 hover:bg-indigo-50" onClick={(e) => { e.stopPropagation(); setDiscussionModal({ isOpen: true, candidate }); }}>
+                                                        <Users size={14} />
                                                     </Button>
                                                     <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={(e) => { e.stopPropagation(); setRemoveModalId(candidate.id); }}>
                                                         <Trash2 size={14} />
                                                     </Button>
-                                                    <ChevronRight size={16} className="text-muted-foreground/30 hidden md:block ml-2" />
+                                                    <ChevronRight size={16} className="text-muted-foreground/30 ml-2" />
                                                 </div>
                                             </div>
                                         </div>
@@ -500,6 +661,117 @@ export default function Shortlist() {
                     <DialogFooter className="gap-2 sm:gap-0">
                         <Button variant="ghost" className="font-medium" onClick={() => setRemoveModalId(null)}>Cancel</Button>
                         <Button variant="destructive" className="font-medium" onClick={handleRemove}>Confirm Removal</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Outreach Modal */}
+            <Dialog open={outreachModal.isOpen} onOpenChange={(open) => !open && setOutreachModal(prev => ({ ...prev, isOpen: false }))}>
+                <DialogContent className="sm:max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                            <Mail className="size-5 text-indigo-600" />
+                            Personalized Outreach
+                        </DialogTitle>
+                        <DialogDescription>
+                            AI-generated communication for <span className="font-semibold text-foreground">{outreachModal.candidate?.profile.name}</span>
+                        </DialogDescription>
+                    </DialogHeader>
+                    
+                    <div className="space-y-6 py-4">
+                        <div className="flex items-center gap-2">
+                            {(['invite', 'reject', 'nurture'] as const).map(t => (
+                                <Button 
+                                    key={t}
+                                    variant={outreachModal.type === t ? 'default' : 'outline'}
+                                    size="sm"
+                                    className="capitalize rounded-full px-4 h-8"
+                                    onClick={() => outreachModal.candidate && handleDraftOutreach(t, outreachModal.candidate)}
+                                    disabled={outreachModal.isDrafting}
+                                >
+                                    {t}
+                                </Button>
+                            ))}
+                        </div>
+
+                        {outreachModal.isDrafting ? (
+                            <div className="h-64 flex flex-col items-center justify-center space-y-4 bg-muted/30 rounded-xl border border-dashed">
+                                <Activity className="size-8 text-indigo-500 animate-pulse" />
+                                <p className="text-sm font-medium text-muted-foreground">Drafting personalized response...</p>
+                            </div>
+                        ) : outreachModal.draft ? (
+                            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Subject</label>
+                                    <div className="p-3 bg-muted/50 rounded-lg text-sm font-semibold border">{outreachModal.draft.subject}</div>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Body</label>
+                                    <div className="p-4 bg-muted/30 rounded-xl text-sm leading-relaxed border whitespace-pre-wrap min-h-48">{outreachModal.draft.body}</div>
+                                </div>
+                            </div>
+                        ) : null}
+                    </div>
+
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="ghost" className="font-medium" onClick={() => setOutreachModal(prev => ({ ...prev, isOpen: false }))}>Cancel</Button>
+                        <Button 
+                            className="font-medium gap-2 bg-indigo-600 hover:bg-indigo-700" 
+                            disabled={!outreachModal.draft || outreachModal.isDrafting}
+                            onClick={() => {
+                                alert(`Email sent to ${outreachModal.candidate?.profile.email}`);
+                                setOutreachModal(prev => ({ ...prev, isOpen: false }));
+                            }}
+                        >
+                            <Send size={14} />
+                            Send Outreach
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Discussion Modal */}
+            <Dialog open={discussionModal.isOpen} onOpenChange={(open) => !open && setDiscussionModal(prev => ({ ...prev, isOpen: false }))}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                            <Users className="size-5 text-indigo-600" />
+                            Team Discussion
+                        </DialogTitle>
+                        <DialogDescription>
+                            Internal notes for <span className="font-semibold text-foreground">{discussionModal.candidate?.profile.name}</span>
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-6 py-4">
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Decision</label>
+                                <div className="flex gap-2">
+                                    <Button variant="outline" size="sm" className="h-7 text-[10px] font-bold text-emerald-600 border-emerald-200 bg-emerald-50 hover:bg-emerald-100">APPROVE</Button>
+                                    <Button variant="outline" size="sm" className="h-7 text-[10px] font-bold text-rose-600 border-rose-200 bg-rose-50 hover:bg-rose-100">REJECT</Button>
+                                </div>
+                            </div>
+                            <Textarea 
+                                placeholder="Share your feedback with the team..."
+                                className="resize-none h-32 text-sm"
+                            />
+                        </div>
+                        <div className="space-y-3 pt-2">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Recent Activity</label>
+                            <div className="space-y-3">
+                                <div className="p-3 bg-muted/30 rounded-lg border text-xs leading-relaxed">
+                                    <span className="font-bold text-foreground">AI Scout:</span> High confidence in technical skills, but note the 2-year gap in 2021.
+                                </div>
+                                <div className="p-3 bg-muted/30 rounded-lg border text-xs leading-relaxed">
+                                    <span className="font-bold text-foreground">Hiring Manager:</span> Approved for technical round.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button className="w-full bg-indigo-600 hover:bg-indigo-700 font-bold" onClick={() => setDiscussionModal(prev => ({ ...prev, isOpen: false }))}>
+                            Save Feedback
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

@@ -11,6 +11,7 @@ export interface RouteOptions {
   temperature?: number;
   max_tokens?: number;
   containsPII?: boolean;
+  response_format?: { type: "text" | "json_object" };
 }
 
 /**
@@ -33,7 +34,8 @@ export async function hybridChatCompletion(
     fallbackCloudModel = 'groq-fast',
     fallbackLocalModel = 'local-sovereign', 
     temperature = 0.3,
-    max_tokens = 2048
+    max_tokens = 2048,
+    response_format
   } = options;
 
   console.log(`[LLMRouter] Analyzing payload. Contains PII: ${containsPII}`);
@@ -41,7 +43,7 @@ export async function hybridChatCompletion(
   // User requested to only use Groq (bypass LiteLLM and Sovereignty)
   if (process.env.USE_DIRECT_GROQ === 'true') {
     console.log('[LLMRouter] USE_DIRECT_GROQ is active. Routing directly to Groq.');
-    return await groqChatCompletion(systemPrompt, userPrompt, temperature, max_tokens);
+    return await groqChatCompletion(systemPrompt, userPrompt, temperature, max_tokens, response_format);
   }
 
   // Construct requested model literal for LiteLLM (e.g., 'openai/gpt-4o' or 'ollama/mistral')
@@ -68,7 +70,7 @@ export async function hybridChatCompletion(
       console.log(`[LLMRouter] Payload cleared. Routing to literal LiteLLM destination: ${resolvedModel}`);
     }
 
-    return await unifiedLiteLlmChat(resolvedModel, systemPrompt, userPrompt, temperature, max_tokens);
+    return await unifiedLiteLlmChat(resolvedModel, systemPrompt, userPrompt, temperature, max_tokens, response_format);
   } catch (error) {
     console.error(`[LLMRouter] LiteLLM Proxy Failed. Attempting direct fallback... Error: ${error}`);
     
@@ -76,7 +78,7 @@ export async function hybridChatCompletion(
     if (resolvedModel?.includes('groq') || resolvedModel === 'groq-fast') {
       try {
         console.log('[LLMRouter] Triggering direct Groq fallback...');
-        return await groqChatCompletion(systemPrompt, userPrompt, temperature, max_tokens);
+        return await groqChatCompletion(systemPrompt, userPrompt, temperature, max_tokens, response_format);
       } catch (fallbackError) {
         console.error('[LLMRouter] Direct fallback failed:', fallbackError);
       }
@@ -94,8 +96,8 @@ export async function autoRoutedChatCompletion(
   baseText: string,
   options: RouteOptions = {}
 ): Promise<string> {
-  // Deep regex scan for obvious PII (emails, phone numbers)
-  const isHighRisk = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})|(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/.test(baseText);
+  // Deep regex scan for obvious PII (emails, phone numbers, SSNs)
+  const isHighRisk = PIIManager.containsPII(baseText);
 
   // If we can scrub it to make it safe, we do so and let it go to the requested provider.
   if (isHighRisk && !options.containsPII) {
@@ -107,7 +109,7 @@ export async function autoRoutedChatCompletion(
       ? `${options.targetProvider}/${options.targetModel}` 
       : (options.fallbackCloudModel || 'groq/llama-3.1-8b-instant');
 
-    return await unifiedLiteLlmChat(modelTarget, systemPrompt, scrubbedText, options.temperature, options.max_tokens);
+    return await unifiedLiteLlmChat(modelTarget, systemPrompt, scrubbedText, options.temperature, options.max_tokens, options.response_format);
   }
 
   // Otherwise, respect manual overrides and route based on risk

@@ -37,7 +37,7 @@ GROQ_API_KEY=your_groq_api_key_here
 # Or for multiple API keys:
 # GROQ_API_KEYS=your_groq_api_key_1,your_groq_api_key_2,your_groq_api_key_3
 OLLAMA_BASE_URL=http://localhost:11434
-HR_TOOLS_PORT=3001
+HR_TOOLS_PORT=3005
 ```
 
 ## Running the Server
@@ -65,7 +65,7 @@ bun run dev
 
 2. Run the container:
    ```bash
-   docker run -p 3001:3001 --env-file .env docapture-hr-tools
+   docker run -p 3005:3005 --env-file .env docapture-hr-tools
    ```
 
 ### Using Docker Compose
@@ -75,7 +75,7 @@ bun run dev
    docker-compose up --build
    ```
 
-The server will be available at `http://localhost:3001`
+The server will be available at `http://localhost:3005`
 
 ### Local Development with Docker (Redis + MongoDB)
 

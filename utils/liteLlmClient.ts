@@ -23,7 +23,8 @@ export async function unifiedLiteLlmChat(
     system: string,
     user: string,
     temperature: number = 0.3,
-    max_tokens: number = 2048
+    max_tokens: number = 2048,
+    response_format?: { type: "text" | "json_object" }
 ): Promise<string> {
     try {
         console.log(`[LiteLLMClient] Routing request to proxy model: ${model}`);
@@ -35,7 +36,8 @@ export async function unifiedLiteLlmChat(
                 { role: "user", content: user }
             ],
             temperature: temperature,
-            max_tokens: max_tokens
+            max_tokens: max_tokens,
+            response_format: response_format as any // Type cast since OpenAI SDK might expect a specific type
         });
 
         const content = response.choices[0]?.message?.content || "";

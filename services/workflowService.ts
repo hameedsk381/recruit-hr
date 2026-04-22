@@ -3,6 +3,7 @@ import { Redis } from 'ioredis';
 import { NotificationService } from './notificationService';
 import { getMongoDb } from '../utils/mongoClient';
 import { WorkflowEngine } from './workflow/workflowEngine';
+import { SequenceEngine } from './nurture/sequenceEngine';
 
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
@@ -57,6 +58,9 @@ export function initializeWorkflow() {
                         break;
                     case 'INTERVIEW_CONFIRMED':
                         await handleInterviewConfirmed(tenantId, payload);
+                        break;
+                    case 'CANDIDATE_STAGE_CHANGED':
+                        await SequenceEngine.triggerAutomatedOutreach(tenantId, type, payload);
                         break;
                 }
 

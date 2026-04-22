@@ -44,7 +44,7 @@ export async function updateTenantSettingsHandler(req: Request, context: AuthCon
         }
 
         const body = await req.json();
-        const { slackWebhookUrl, teamsWebhookUrl, notificationsEnabled, allowedOrigins } = body;
+        const { slackWebhookUrl, teamsWebhookUrl, notificationsEnabled, allowedOrigins, schedulingLink } = body;
 
         const db = getMongoDb();
         if (!db) return new Response(JSON.stringify({ error: "DB Unavailable" }), { status: 503 });
@@ -56,6 +56,7 @@ export async function updateTenantSettingsHandler(req: Request, context: AuthCon
                     slackWebhookUrl,
                     teamsWebhookUrl,
                     notificationsEnabled,
+                    schedulingLink,
                     ...(Array.isArray(allowedOrigins) ? { allowedOrigins } : {}),
                     updatedAt: new Date()
                 }

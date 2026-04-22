@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../api/client';
+import { useApp } from '../context/AppContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Plus, RefreshCw, Send, X } from 'lucide-react';
@@ -24,6 +25,7 @@ const EMPTY_FORM = {
 };
 
 export default function Offers() {
+    const { offerDraft, setOfferDraft } = useApp();
     const [offers, setOffers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
@@ -38,6 +40,19 @@ export default function Offers() {
             if (res.success) setOffers(res.offers);
         } finally { setLoading(false); }
     };
+
+    useEffect(() => {
+        if (offerDraft) {
+            setForm({
+                ...EMPTY_FORM,
+                candidateId: offerDraft.candidateId || '',
+                jobId: offerDraft.jobId || '',
+                notes: `Offer for ${offerDraft.candidateName || 'Candidate'} for ${offerDraft.jobTitle || 'Position'}`
+            });
+            setShowForm(true);
+            setOfferDraft(null); // Clear after consuming
+        }
+    }, [offerDraft, setOfferDraft]);
 
     useEffect(() => { load(); }, [filter]);
 

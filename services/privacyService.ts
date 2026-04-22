@@ -16,10 +16,11 @@ export class PrivacyService {
         }
 
         try {
-            const objectId = new ObjectId(candidateId);
+            const isIdValid = ObjectId.isValid(candidateId);
+            const idFilter = isIdValid ? { _id: new ObjectId(candidateId) } : { _id: candidateId };
 
             // 1. Delete the raw candidate profile & resume extractions
-            await db.collection('candidates').deleteOne({ _id: objectId });
+            await db.collection('candidates').deleteOne(idFilter as any);
 
             // 2. Anonymize specific Candidate metrics in the Data Warehouse/Audit Logs
             // We update rather than delete so the company doesn't lose historical KPI/throughput data.
@@ -88,7 +89,10 @@ export class PrivacyService {
         if (!db) return false;
 
         try {
-            const candidate = await db.collection('candidates').findOne({ _id: new ObjectId(candidateId) });
+            const isIdValid = ObjectId.isValid(candidateId);
+            const idFilter = isIdValid ? { _id: new ObjectId(candidateId) } : { _id: candidateId };
+            
+            const candidate = await db.collection('candidates').findOne(idFilter as any);
             if (!candidate) throw new Error("Candidate not found");
             
             // If they explicitly un-ticked the AI consent box, throw to prevent routing.

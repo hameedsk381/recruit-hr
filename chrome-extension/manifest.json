@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Reckruit.ai Sourcing Copilot",
+  "version": "1.0.0",
+  "description": "1-click candidate ingestion from LinkedIn and GitHub into your Reckruit.ai Talent Pool.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": [
+    "https://*.linkedin.com/*",
+    "https://*.github.com/*",
+    "https://*.reckruit.ai/*",
+    "http://localhost:3001/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://*.linkedin.com/in/*", "https://*.github.com/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"]
+    }
+  ]
+}

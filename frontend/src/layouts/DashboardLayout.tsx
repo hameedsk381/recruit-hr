@@ -23,6 +23,7 @@ import Marketplace from '../pages/Marketplace';
 import Workflows from '../pages/Workflows';
 import Reports from '../pages/Reports';
 import Onboarding from '../pages/Onboarding';
+import Sourcing from '../pages/Sourcing';
 import { Search, Bell, LogOut } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -69,6 +70,7 @@ export default function DashboardLayout() {
             case 'workflows': return <Workflows />;
             case 'reports': return <Reports />;
             case 'onboarding': return <Onboarding />;
+            case 'sourcing': return <Sourcing />;
 
             default: return <Dashboard />;
         }

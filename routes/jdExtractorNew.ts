@@ -124,6 +124,26 @@ export async function jdExtractorNewHandler(req: Request): Promise<Response> {
     // Extract JD data from buffer
     const jdData = await extractJobDescriptionData(buffer);
     
+    // Cross-verify with heuristic validator to prevent LLM bypass
+    const { validateJobDescription } = await import('../services/jdValidator');
+    const validation = validateJobDescription(jdData);
+    
+    console.log(`[JDExtractorNewHandler] Validation: type=${validation.documentType}, score=${validation.suitabilityScore}, isValid=${validation.isValid}`);
+    
+    if (validation.documentType === 'resume') {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'DOCUMENT_IS_RESUME',
+          message: 'The uploaded document appears to be a candidate resume, not a job description.'
+        }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
     // Transform the data to match the new response format
     const transformedData: JobDescriptionResponse = transformToJobDescriptionResponse(jdData);
     

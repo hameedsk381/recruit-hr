@@ -109,6 +109,32 @@ export default function Settings() {
                             </div>
                         </div>
                     </div>
+
+                    <div className="vercel-card space-y-6 bg-card">
+                        <div className="space-y-1">
+                            <h2 className="text-lg font-semibold text-foreground tracking-tight">Outreach & Scheduling</h2>
+                            <p className="text-sm text-muted-foreground">Configure how you connect with candidates.</p>
+                        </div>
+                        
+                        <div className="h-px bg-border/50 w-full" />
+
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <Label className="text-sm font-medium text-foreground">Global Scheduling Link</Label>
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="text" 
+                                        placeholder="https://cal.com/your-name/technical-screen" 
+                                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                    />
+                                    <Button variant="outline" size="sm" className="h-9 px-4 font-medium">
+                                        Save
+                                    </Button>
+                                </div>
+                                <p className="text-[10px] text-muted-foreground italic">This link will be automatically included in "Next Steps" emails for shortlisted candidates.</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

@@ -9,6 +9,7 @@ import { jobStatusHandler } from "./routes/jobStatus";
 import { analyticsHandler } from "./routes/analytics";
 import { copilotChatHandler } from "./routes/copilotChat";
 import { recruiterAssessHandler, recruiterBatchAssessHandler } from "./routes/recruiterAssess";
+import { draftOutreachHandler } from "./routes/outreachDraft";
 import { InterviewService } from "./services/interviewService";
 import {
   listInterviewsHandler,
@@ -29,26 +30,28 @@ import {
   synthesizeScorecardsHandler
 } from "./routes/scorecards";
 import { jdExtractHandler } from "./routes/jdExtract";
+import { jdExtractTextHandler } from "./routes/jdExtractText";
 import { jdExtractorNewHandler } from "./routes/jdExtractorNew";
 import { jdExtractorStreamingHandler } from "./routes/jdExtractorStreaming";
 import { jdValidateHandler } from "./routes/jdValidate";
 import { mcqGenerateHandler } from "./routes/mcqGenerate";
 import { voiceInterviewHandler } from "./routes/voiceInterview";
 import { audioEvaluateHandler } from "./routes/audioEvaluate";
-import { deleteCandidateGdprHandler, runRetentionPolicyHandler } from "./routes/privacy";
+import { deleteCandidateGdprHandler as privacyDeleteHandler, runRetentionPolicyHandler } from "./routes/privacy";
 import { PrivacyService } from "./services/privacyService";
 import { getDpdpNoticeHandler, fileGrievanceHandler, consentManagerWebhookHandler } from "./routes/dpdpCompliance";
 import { bulkProcessUploadHandler, getBatchStatusHandler } from "./routes/batchProcessing";
 import { getRoiAnalyticsHandler } from "./routes/roiAnalytics";
 import { atsSyncHandler } from "./routes/atsSync";
-import { 
+import {
   getRecruiterHistoryHandler,
   getActiveStateHandler,
-  updateCandidateHandler
+  updateCandidateHandler,
+  listBatchesHandler
 } from "./routes/recruiterState";
 import { getTenantSettingsHandler, updateTenantSettingsHandler, updateBlindScreeningHandler } from "./routes/tenantSettings";
 import { getPublicJobsHandler, publishJobHandler } from "./routes/publicJobs";
-import { publicApplyHandler, getApplicationStatusHandler } from "./routes/candidatePortal";
+import { publicApplyHandler, getApplicationStatusHandler, matchMyResumeHandler } from "./routes/candidatePortal";
 import { candidateChatHandler } from "./routes/candidateChat";
 import { ssoInitHandler, ssoCallbackHandler } from "./routes/sso";
 import { rateLimitMiddleware } from "./middleware/rateLimiter";
@@ -79,9 +82,13 @@ import {
 
 import {
   listIntegrationsHandler, connectIntegrationHandler,
-  disconnectIntegrationHandler, getIntegrationStatusHandler
+  disconnectIntegrationHandler, getIntegrationStatusHandler,
+  listATSJobsHandler, pushATSScoreHandler,
 } from "./routes/v1/integrations";
 import { listClientsHandler, addClientHandler, removeClientHandler } from "./routes/v1/agency";
+import { ingestPassiveCandidateHandler, listPassiveCandidatesHandler } from "./routes/v1/sourcing";
+import { getDynamicAssessmentHandler, submitAssessmentHandler } from "./routes/v1/assessments";
+import { getHiringForecastHandler } from "./routes/v1/analytics";
 
 // Phase 2 — v1 routes
 import {
@@ -120,7 +127,7 @@ import { generateReportHandler } from "./routes/v1/reports";
 import {
   initiateOnboardingHandler, listOnboardingHandler, updateOnboardingTaskHandler
 } from "./routes/v1/onboarding";
-import { getEeoReportHandler, deleteCandidateGdprHandler } from "./routes/v1/compliance";
+import { getEeoReportHandler, deleteCandidateGdprHandler as complianceGdprPurgeHandler } from "./routes/v1/compliance";
 import { SequenceEngine } from "./services/nurture/sequenceEngine";
 import { JobBoardService } from "./services/jobBoardService";
 
@@ -130,7 +137,7 @@ config();
 
 import { listAPIKeysHandler, createAPIKeyHandler, revokeAPIKeyHandler } from "./routes/apiKeys";
 
-const PORT = Number(process.env.HR_TOOLS_PORT) || 3001;
+const PORT = Number(process.env.HR_TOOLS_PORT) || 3005;
 
 
 // Simple request logging
@@ -183,19 +190,20 @@ function checkRequestSize(req: Request, normalizedPath: string): Response | null
 async function startServer() {
   try {
     console.log('[Index] Bootstrapping Infrastructure...');
-    
+
     // 1. Redis
     await initializeRedisClient();
-    
+
     // 2. MongoDB
     await initializeMongoClient();
-    
+
     // 3. Background Workers (Wait for DB)
     initializeWorkflow();
-    
+
     // 4. Start HTTP Server
     serve({
       port: PORT,
+      hostname: "0.0.0.0",
       fetch: async (req) => {
         const startTime = Date.now();
         const url = new URL(req.url);
@@ -225,7 +233,7 @@ async function startServer() {
         // Phase 1: API Versioning Support
         const isVersioned = url.pathname.startsWith("/v1/");
         const normalizedPath = isVersioned ? url.pathname.slice(3) : url.pathname;
-        
+
         const PUBLIC_ROUTES = [
           "/", "/health", "/ready", "/metrics", "/mongo-info", "/auth/login", "/auth/register",
           "/auth/sso/init", "/auth/sso/callback",
@@ -265,8 +273,8 @@ async function startServer() {
 
         // 1. Rate Limiting (re-applied with headers)
         if (rateLimitResponse) {
-            logRequest(req, startTime, rateLimitResponse.status);
-            return finalHandler(rateLimitResponse);
+          logRequest(req, startTime, rateLimitResponse.status);
+          return finalHandler(rateLimitResponse);
         }
 
         // 2. Auth Context
@@ -282,7 +290,7 @@ async function startServer() {
 
         try {
           // Phase 1 & 2: Infrastructure Endpoints
-          if (normalizedPath === "/ready")   return finalHandler(await readyHandler(req));
+          if (normalizedPath === "/ready") return finalHandler(await readyHandler(req));
           if (normalizedPath === "/metrics") return finalHandler(await metricsHandler(req));
 
           // ROUTE HANDLERS
@@ -327,6 +335,11 @@ async function startServer() {
             logRequest(req, startTime, response.status);
             return finalHandler(response);
           }
+          if (req.method === "POST" && normalizedPath === "/extract-jd-text") {
+            const response = await jdExtractTextHandler(req);
+            logRequest(req, startTime, response.status);
+            return finalHandler(response);
+          }
 
           if (req.method === "POST" && normalizedPath === "/extract-jd-new") {
             const response = await jdExtractorNewHandler(req);
@@ -366,6 +379,12 @@ async function startServer() {
 
           if (req.method === "POST" && normalizedPath === "/match") {
             const response = await jobMatchHandler(req, context);
+            logRequest(req, startTime, response.status);
+            return finalHandler(response);
+          }
+
+          if (req.method === "POST" && normalizedPath === "/draft-outreach") {
+            const response = await draftOutreachHandler(req, context);
             logRequest(req, startTime, response.status);
             return finalHandler(response);
           }
@@ -420,6 +439,12 @@ async function startServer() {
 
           if (req.method === "GET" && normalizedPath === "/analytics/roi") {
             const response = await getRoiAnalyticsHandler(req, context);
+            logRequest(req, startTime, response.status);
+            return finalHandler(response);
+          }
+
+          if (req.method === "GET" && normalizedPath === "/campaigns") {
+            const response = await listBatchesHandler(req, context);
             logRequest(req, startTime, response.status);
             return finalHandler(response);
           }
@@ -562,6 +587,12 @@ async function startServer() {
             return finalHandler(response);
           }
 
+          if (req.method === "POST" && normalizedPath === "/public/match-my-resume") {
+            const response = await matchMyResumeHandler(req);
+            logRequest(req, startTime, response.status);
+            return finalHandler(response);
+          }
+
           if (req.method === "POST" && normalizedPath === "/public/apply") {
             const response = await publicApplyHandler(req);
             logRequest(req, startTime, response.status);
@@ -581,7 +612,7 @@ async function startServer() {
           }
 
           if (req.method === "DELETE" && normalizedPath.startsWith("/privacy/candidate/")) {
-            const response = await deleteCandidateGdprHandler(req, context);
+            const response = await privacyDeleteHandler(req, context);
             logRequest(req, startTime, response.status);
             return finalHandler(response);
           }
@@ -627,8 +658,8 @@ async function startServer() {
           const reqMatch = normalizedPath.match(/^\/requisitions\/([^/]+)$/);
           if (reqMatch) {
             const id = reqMatch[1];
-            if (req.method === "GET")    { const r = await getRequisitionHandler(req, context, id); logRequest(req, startTime, r.status); return finalHandler(r); }
-            if (req.method === "PATCH")  { const r = await updateRequisitionHandler(req, context, id); logRequest(req, startTime, r.status); return finalHandler(r); }
+            if (req.method === "GET") { const r = await getRequisitionHandler(req, context, id); logRequest(req, startTime, r.status); return finalHandler(r); }
+            if (req.method === "PATCH") { const r = await updateRequisitionHandler(req, context, id); logRequest(req, startTime, r.status); return finalHandler(r); }
             if (req.method === "DELETE") { const r = await deleteRequisitionHandler(req, context, id); logRequest(req, startTime, r.status); return finalHandler(r); }
           }
           const reqApprove = normalizedPath.match(/^\/requisitions\/([^/]+)\/approve$/);
@@ -654,7 +685,7 @@ async function startServer() {
           const offerMatch = normalizedPath.match(/^\/offers\/([^/]+)$/);
           if (offerMatch) {
             const id = offerMatch[1];
-            if (req.method === "GET")   { const r = await getOfferHandler(req, context, id); logRequest(req, startTime, r.status); return finalHandler(r); }
+            if (req.method === "GET") { const r = await getOfferHandler(req, context, id); logRequest(req, startTime, r.status); return finalHandler(r); }
             if (req.method === "PATCH") { const r = await updateOfferHandler(req, context, id); logRequest(req, startTime, r.status); return finalHandler(r); }
           }
           const offerSend = normalizedPath.match(/^\/offers\/([^/]+)\/send$/);
@@ -701,7 +732,7 @@ async function startServer() {
           const jpMatch = normalizedPath.match(/^\/job-postings\/([^/]+)$/);
           if (jpMatch) {
             const id = jpMatch[1];
-            if (req.method === "GET")    { const r = await getJobPostingMetricsHandler(req, context, id); logRequest(req, startTime, r.status); return finalHandler(r); }
+            if (req.method === "GET") { const r = await getJobPostingMetricsHandler(req, context, id); logRequest(req, startTime, r.status); return finalHandler(r); }
             if (req.method === "DELETE") { const r = await unpublishJobPostingHandler(req, context, id); logRequest(req, startTime, r.status); return finalHandler(r); }
           }
           const jpSync = normalizedPath.match(/^\/job-postings\/([^/]+)\/sync$/);
@@ -725,7 +756,7 @@ async function startServer() {
           const tpMatch = normalizedPath.match(/^\/talent-pool\/([^/]+)$/);
           if (tpMatch) {
             const id = tpMatch[1];
-            if (req.method === "GET")   { const r = await getTalentProfileHandler(req, context, id); logRequest(req, startTime, r.status); return finalHandler(r); }
+            if (req.method === "GET") { const r = await getTalentProfileHandler(req, context, id); logRequest(req, startTime, r.status); return finalHandler(r); }
             if (req.method === "PATCH") { const r = await updateTalentProfileHandler(req, context, id); logRequest(req, startTime, r.status); return finalHandler(r); }
           }
           const tpNurture = normalizedPath.match(/^\/talent-pool\/([^/]+)\/nurture$/);
@@ -834,7 +865,8 @@ async function startServer() {
             const r = await getEeoReportHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
           }
           if (req.method === "POST" && normalizedPath === "/compliance/gdpr-purge") {
-            const r = await deleteCandidateGdprHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
+            const r = await complianceGdprPurgeHandler(req, context);
+ logRequest(req, startTime, r.status); return finalHandler(r);
           }
           if (req.method === "POST" && normalizedPath === "/predictions/outcomes") {
             const r = await recordOutcomeHandler(req, context); logRequest(req, startTime, r.status); return finalHandler(r);
@@ -865,10 +897,10 @@ async function startServer() {
           const workflowMatch = normalizedPath.match(/^\/workflows\/([^/]+)$/);
           if (workflowMatch) {
             if (req.method === "PATCH") {
-                const r = await updateWorkflowHandler(req, context, workflowMatch[1]); logRequest(req, startTime, r.status); return finalHandler(r);
+              const r = await updateWorkflowHandler(req, context, workflowMatch[1]); logRequest(req, startTime, r.status); return finalHandler(r);
             }
             if (req.method === "DELETE") {
-                const r = await deleteWorkflowHandler(req, context, workflowMatch[1]); logRequest(req, startTime, r.status); return finalHandler(r);
+              const r = await deleteWorkflowHandler(req, context, workflowMatch[1]); logRequest(req, startTime, r.status); return finalHandler(r);
             }
           }
           if (req.method === "POST" && normalizedPath.match(/^\/workflows\/[^/]+\/activate$/))
@@ -892,6 +924,35 @@ async function startServer() {
           if (req.method === "GET" && normalizedPath.match(/^\/integrations\/[^/]+\/status$/)) {
             const integrationId = normalizedPath.split("/")[2];
             return finalHandler(await getIntegrationStatusHandler(req, context, integrationId));
+          }
+          if (req.method === "GET" && normalizedPath.match(/^\/integrations\/[^/]+\/jobs$/)) {
+            const integrationId = normalizedPath.split("/")[2];
+            return finalHandler(await listATSJobsHandler(req, context, integrationId));
+          }
+          if (req.method === "POST" && normalizedPath.match(/^\/integrations\/[^/]+\/push-score$/)) {
+            const integrationId = normalizedPath.split("/")[2];
+            return finalHandler(await pushATSScoreHandler(req, context, integrationId));
+          }
+
+          // Sourcing routes
+          if (req.method === "POST" && normalizedPath === "/sourcing/ingest") {
+            return finalHandler(await ingestPassiveCandidateHandler(req, context));
+          }
+          if (req.method === "GET" && normalizedPath === "/sourcing/list") {
+            return finalHandler(await listPassiveCandidatesHandler(req, context));
+          }
+
+          // Assessment routes
+          if (req.method === "GET" && normalizedPath === "/assessments/dynamic") {
+            return finalHandler(await getDynamicAssessmentHandler(req, context));
+          }
+          if (req.method === "POST" && normalizedPath === "/assessments/submit") {
+            return finalHandler(await submitAssessmentHandler(req, context));
+          }
+
+          // Analytics & Predictions
+          if (req.method === "GET" && normalizedPath === "/analytics/forecast") {
+            return finalHandler(await getHiringForecastHandler(req, context));
           }
 
           // Agency routes
@@ -950,17 +1011,17 @@ setInterval(async () => {
 }, 60 * 1000);
 
 setInterval(async () => {
-    try {
-      await PrivacyService.enforceDataRetention(6);
-    } catch (e) {
-      console.error('[Maintenance] Retention check failed:', e);
-    }
+  try {
+    await PrivacyService.enforceDataRetention(6);
+  } catch (e) {
+    console.error('[Maintenance] Retention check failed:', e);
+  }
 }, 1000 * 60 * 60 * 24);
 
 setInterval(async () => {
-    try {
-      await SequenceEngine.processDueSteps();
-    } catch (e) {
-      console.error('[Maintenance] Nurture processing failed:', e);
-    }
+  try {
+    await SequenceEngine.processDueSteps();
+  } catch (e) {
+    console.error('[Maintenance] Nurture processing failed:', e);
+  }
 }, 1000 * 60 * 60); // Check every hour

@@ -35,7 +35,7 @@ Create `tests/security.test.ts`:
 ```typescript
 import { expect, test, describe } from "bun:test";
 
-const BASE_URL = "http://localhost:3001";
+const BASE_URL = "http://localhost:3005";
 
 describe("Security: CORS", () => {
   test("allowed origin returns mirrored Access-Control-Allow-Origin", async () => {

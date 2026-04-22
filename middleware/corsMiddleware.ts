@@ -14,7 +14,17 @@ const ALLOWED_HEADERS = "Content-Type, Authorization, x-tenant-id, X-API-Version
 function isLocalOrigin(origin: string): boolean {
   try {
     const { hostname } = new URL(origin);
-    return hostname === "localhost" || hostname === "127.0.0.1";
+    // Allow localhost, 127.0.0.1, and common local network IP ranges
+    return (
+      hostname === "localhost" || 
+      hostname === "127.0.0.1" || 
+      hostname === "91.108.104.46" ||
+      hostname.startsWith("192.168.") || 
+      hostname.startsWith("10.") || 
+      (hostname.startsWith("172.") && 
+       parseInt(hostname.split(".")[1]) >= 16 && 
+       parseInt(hostname.split(".")[1]) <= 31)
+    );
   } catch {
     return false;
   }

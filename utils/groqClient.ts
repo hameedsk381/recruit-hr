@@ -83,7 +83,8 @@ export async function groqChatCompletion(
   system: string,
   user: string,
   temperature: number = 0.3, // Lower temperature for more deterministic output
-  max_tokens: number = 1024 // Limit tokens to reduce costs and improve speed
+  max_tokens: number = 1024, // Limit tokens to reduce costs and improve speed
+  response_format?: { type: "text" | "json_object" }
 ): Promise<string> {
   console.log(`[GroqClient] Starting API call - User prompt length: ${user.length} chars, Max tokens: ${max_tokens}`);
   console.log(`[GroqClient] Circuit breaker state: ${circuitBreaker.getState()}`);
@@ -114,6 +115,7 @@ export async function groqChatCompletion(
           model: GROQ_MODEL,
           temperature: temperature,
           max_tokens: max_tokens,
+          response_format: response_format,
         });
         
         const responseContent = chatCompletion.choices[0]?.message?.content || '';

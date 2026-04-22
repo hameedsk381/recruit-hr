@@ -1,4 +1,5 @@
 import { getAllIntegrations, getIntegration } from "../../services/integrationRegistry";
+import { ATSService } from "../../services/integrations/atsService";
 import {
   listTenantIntegrations,
   connectIntegration,
@@ -98,6 +99,46 @@ export async function getIntegrationStatusHandler(
   try {
     const statusData = await getIntegrationStatus(context.tenantId, integrationId);
     return Response.json({ success: true, ...statusData });
+  } catch (err: any) {
+    const status = err.status ?? 500;
+    return Response.json({ success: false, error: err.message }, { status });
+  }
+}
+
+export async function listATSJobsHandler(
+  req: Request,
+  context: AuthContext,
+  integrationId: string
+): Promise<Response> {
+  try {
+    const jobs = await ATSService.getJobs(context.tenantId, integrationId);
+    return Response.json({ success: true, jobs });
+  } catch (err: any) {
+    const status = err.status ?? 500;
+    return Response.json({ success: false, error: err.message }, { status });
+  }
+}
+
+export async function pushATSScoreHandler(
+  req: Request,
+  context: AuthContext,
+  integrationId: string
+): Promise<Response> {
+  try {
+    const body = await req.json();
+    const { atsCandidateId, score, summary, jobId } = body;
+
+    if (!atsCandidateId || score === undefined) {
+      return Response.json({ success: false, error: "atsCandidateId and score are required" }, { status: 400 });
+    }
+
+    const result = await ATSService.pushCandidateScore(context.tenantId, integrationId, atsCandidateId, {
+      score,
+      summary,
+      jobId
+    });
+
+    return Response.json({ success: result });
   } catch (err: any) {
     const status = err.status ?? 500;
     return Response.json({ success: false, error: err.message }, { status });

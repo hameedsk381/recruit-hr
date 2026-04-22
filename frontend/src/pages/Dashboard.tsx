@@ -37,18 +37,20 @@ interface ROIData {
 }
 
 export default function Dashboard() {
-    const { job, setView, setError } = useApp();
+    const { job, setView, setError, loadCampaign } = useApp();
     const [data, setData] = useState<AnalyticsData | null>(null);
     const [roi, setRoi] = useState<ROIData | null>(null);
+    const [campaigns, setCampaigns] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'compliance'>('overview');
 
     useEffect(() => {
-        const fetchAnalytics = async () => {
+        const fetchData = async () => {
             try {
-                const [res, roiRes] = await Promise.all([
+                const [res, roiRes, campRes] = await Promise.all([
                     api.getAnalytics(),
-                    api.getRoiAnalytics()
+                    api.getRoiAnalytics(),
+                    api.listCampaigns()
                 ]);
                 
                 if (res.success) {
@@ -57,6 +59,9 @@ export default function Dashboard() {
                 if (roiRes.success) {
                     setRoi(roiRes.summary);
                 }
+                if (campRes.success) {
+                    setCampaigns(campRes.batches);
+                }
             } catch (err) {
                 setError('dashboard', 'Failed to load analytics data');
             } finally {
@@ -64,7 +69,7 @@ export default function Dashboard() {
             }
         };
 
-        fetchAnalytics();
+        fetchData();
     }, [setError]);
 
     if (loading) {
@@ -90,17 +95,17 @@ export default function Dashboard() {
                 <div className="space-y-1">
                     <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
                         <Activity className="size-6" />
-                        Recruitment Overview
+                        Talent Command Center
                     </h1>
-                    <p className="text-sm text-muted-foreground">Manage your hiring progress and team efficiency.</p>
+                    <p className="text-sm text-muted-foreground">Monitor your hiring velocity and pipeline health in real-time.</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10 border-none font-semibold text-[10px] uppercase tracking-wider h-6 px-2.5 flex items-center gap-1.5">
+                    <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10 border border-emerald-500/20 font-semibold text-[10px] uppercase tracking-wider h-6 px-2.5 flex items-center gap-1.5 shadow-sm shadow-emerald-500/10">
                         <span className="relative flex h-2 w-2">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                         </span>
-                        System Operational
+                        Engine Online
                     </Badge>
                 </div>
             </div>
@@ -227,7 +232,7 @@ export default function Dashboard() {
                         {/* Summary Cards */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-6">
                             <div className="vercel-card bg-card space-y-4">
-                                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Candidate Pipeline</p>
+                                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Talent Reach</p>
                                 <div className="flex items-end gap-3">
                                     <h2 className="text-3xl font-bold text-foreground tracking-tight">{data.totalResumesProcessed}</h2>
                                     <span className="text-xs font-semibold text-emerald-600 bg-emerald-500/10 px-1.5 py-0.5 rounded flex items-center gap-0.5 mb-1">
@@ -237,57 +242,70 @@ export default function Dashboard() {
                             </div>
 
                             <div className="vercel-card bg-card space-y-4">
-                                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Avg Assessment</p>
+                                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Analysis Velocity</p>
                                 <div className="flex items-end gap-3">
                                     <h2 className="text-3xl font-bold text-foreground tracking-tight">{(data.averageAssessmentTimeMs / 1000).toFixed(1)}s</h2>
-                                    <span className="text-xs font-semibold text-muted-foreground mb-1">per resume</span>
+                                    <span className="text-xs font-semibold text-muted-foreground mb-1">per profile</span>
                                 </div>
                             </div>
 
                             <div className="vercel-card bg-card space-y-4">
-                                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Match Accuracy</p>
+                                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Selection Precision</p>
                                 <div className="flex items-end gap-3">
                                     <h2 className="text-3xl font-bold text-foreground tracking-tight">{data.highMatchRate}%</h2>
                                     <span className="text-xs font-semibold text-emerald-600 bg-emerald-500/10 px-1.5 py-0.5 rounded flex items-center gap-0.5 mb-1">
-                                        TRUSTED
+                                        RELIABLE
                                     </span>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Recent Activity (Deployments Style) */}
-                        <div className="vercel-card !p-0 overflow-hidden bg-card">
-                            <div className="p-5 border-b border-border/50 flex items-center justify-between bg-muted/20">
-                                <h3 className="text-sm font-semibold text-foreground tracking-tight">Recent Applications</h3>
-                                <div className="flex items-center gap-1.5 opacity-70">
-                                    <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                    <span className="text-[10px] font-semibold uppercase tracking-wider">Live Stream</span>
-                                </div>
+                        {/* Recent Campaigns List */}
+                        <div className="space-y-4 pt-4">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                                    <Database size={14} />
+                                    Active Campaigns
+                                </h3>
+                                {campaigns.length > 5 && (
+                                    <Button variant="link" className="text-[10px] uppercase font-bold p-0 h-auto" onClick={() => setView('history')}>
+                                        View All
+                                    </Button>
+                                )}
                             </div>
-                            <div className="divide-y divide-border/50">
-                                {data.recentBatchTrends.slice(0, 5).map((trend, i) => (
-                                    <div key={i} className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between hover:bg-muted/30 transition-colors gap-4">
-                                        <div className="flex items-center gap-4">
-                                            <div className="size-10 rounded border border-border/50 bg-background flex items-center justify-center font-mono text-[10px] font-semibold text-muted-foreground shrink-0 shadow-sm">
-                                                {trend.date.split('-').pop()}
-                                            </div>
-                                            <div className="space-y-0.5">
-                                                <p className="font-semibold text-sm text-foreground">Batch Screening Result</p>
-                                                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                                                    <Clock size={12} className="opacity-70" /> {trend.count} Resumes evaluated • {trend.date}
-                                                </p>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {campaigns.slice(0, 4).map((camp) => (
+                                    <button 
+                                        key={camp.id}
+                                        onClick={() => loadCampaign(camp.id)}
+                                        className="vercel-card flex items-center justify-between hover:border-foreground/20 transition-all text-left bg-card group"
+                                    >
+                                        <div className="space-y-1 overflow-hidden">
+                                            <h4 className="font-bold text-foreground truncate">{camp.title}</h4>
+                                            <div className="flex items-center gap-2 text-[10px] font-medium text-muted-foreground">
+                                                <span>{camp.company}</span>
+                                                <span>•</span>
+                                                <span>{camp.candidateCount} Candidates</span>
                                             </div>
                                         </div>
-                                        <div className="flex items-center justify-between sm:justify-end gap-4">
-                                            <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10 border-none font-semibold text-[10px] uppercase tracking-wider h-6 px-2">
-                                                Success
+                                        <div className="shrink-0 flex items-center gap-3">
+                                            <Badge variant="outline" className={cn(
+                                                "text-[9px] uppercase tracking-tighter px-1.5 h-5",
+                                                camp.status === 'completed' ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-blue-50 text-blue-600 border-blue-200"
+                                            )}>
+                                                {camp.status}
                                             </Badge>
-                                            <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-foreground shrink-0">
-                                                <ArrowUpRight size={16} />
-                                            </Button>
+                                            <ArrowUpRight size={14} className="text-muted-foreground group-hover:text-foreground transition-colors" />
                                         </div>
-                                    </div>
+                                    </button>
                                 ))}
+                                
+                                {campaigns.length === 0 && (
+                                    <div className="col-span-full py-12 text-center border border-dashed rounded-xl border-border">
+                                        <p className="text-sm text-muted-foreground">No recent campaigns found. Post a job to get started.</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </motion.div>

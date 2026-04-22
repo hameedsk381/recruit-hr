@@ -103,20 +103,20 @@ export function validateJobDescription(jdData: JobDescriptionData): JDValidation
   }
   
   if (!jdData.company || jdData.company.trim() === '') {
-    errors.push('Company name is missing');
-    missingCriticalFields.push('company');
+    warnings.push('Company name is missing');
+    missingRecommendedFields.push('company');
   }
   
   if (!jdData.skills || jdData.skills.length === 0) {
-    errors.push('Required skills are missing');
-    missingCriticalFields.push('skills');
+    warnings.push('Required skills are missing');
+    missingRecommendedFields.push('skills');
   } else if (jdData.skills.length < 3) {
     warnings.push('Only a few skills specified, matching accuracy may be limited');
   }
   
   if (!jdData.requirements || jdData.requirements.length === 0) {
-    errors.push('Job requirements are missing');
-    missingCriticalFields.push('requirements');
+    warnings.push('Job requirements are missing');
+    missingRecommendedFields.push('requirements');
   }
   
   // Check recommended fields
@@ -229,16 +229,47 @@ function determineDocumentType(jdData: JobDescriptionData): 'job_description' | 
   // Check for typical job description fields
   const hasJDFields = !!(jdData.title && jdData.company && jdData.skills && jdData.requirements);
   
-  // Check for typical resume fields (heuristic approach)
-  // This is a simplified check - a real implementation would be more sophisticated
+  // Advanced heuristic for Resume vs JD detection
+  const resumeKeywords = [
+    'curriculum vitae', 'cv', 'summary', 'education', 'hobbies', 'objective', 
+    'projects', 'personal info', 'languages', 'skills & interests', 'experience summary',
+    'work history', 'professional profile', 'born', 'nationality', 'marital status'
+  ];
+  const jdKeywords = [
+    'responsibilities', 'qualifications', 'about the role', 'benefits', 'equal opportunity', 
+    'requirements', 'reporting to', 'company overview', 'what we offer', 'job purpose',
+    'key accountabilities', 'successful candidate', 'apply now'
+  ];
+  
+  const textContent = (jdData.description || '').toLowerCase();
+  const resumeScore = resumeKeywords.filter(k => textContent.includes(k)).length;
+  const jdScore = jdKeywords.filter(k => textContent.includes(k)).length;
+
+  // Check if title looks like a person's name (heuristic: 2-3 words, capitalized, no common job keywords)
+  const isNameLike = (str: string) => {
+    if (!str) return false;
+    const words = str.trim().split(/\s+/);
+    const commonJobWords = ['engineer', 'manager', 'developer', 'analyst', 'lead', 'senior', 'junior', 'associate', 'consultant', 'director', 'vp', 'executive', 'officer', 'specialist'];
+    const hasJobWord = words.some(w => commonJobWords.includes(w.toLowerCase()));
+    return words.length >= 2 && words.length <= 3 && words.every(w => /^[A-Z]/.test(w)) && !hasJobWord;
+  };
+
   const hasResumeIndicators = (
     (jdData as any).name || 
     (jdData as any).email || 
     (jdData as any).phone ||
-    (jdData as any).education
+    (jdData as any).education ||
+    (jdData as any).candidateName ||
+    isNameLike(jdData.title) ||
+    resumeScore > jdScore + 1
   );
   
-  // If very few fields are populated, it might be invalid
+  // If it has very clear resume fields, it's a resume
+  if ((jdData as any).email || (jdData as any).phone || (jdData as any).education) {
+    return 'resume';
+  }
+  
+  // If it has very few fields are populated, it might be invalid
   const keyFields = [
     jdData.title,
     jdData.company,
@@ -248,7 +279,7 @@ function determineDocumentType(jdData: JobDescriptionData): 'job_description' | 
   
   const populatedFields = keyFields.filter(field => 
     field !== undefined && field !== null && 
-    (typeof field === 'string' ? field.trim() !== '' : field > 0)
+    (typeof field === 'string' ? field.trim() !== '' : (typeof field === 'number' && field > 0))
   ).length;
   
   // If very few fields are populated, it might be invalid

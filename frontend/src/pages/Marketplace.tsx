@@ -7,8 +7,8 @@ import {
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
 } from "@/components/ui/dialog";
 import {
-    LayoutGrid, Search, Zap, ExternalLink, Plus,
-    ArrowRight, Star, Key, Copy, Trash2, RefreshCw,
+    LayoutGrid, Search, ExternalLink, Plus,
+    ArrowRight, Key, Copy, Trash2, RefreshCw,
     Code, Book, Rocket, Loader2, X
 } from 'lucide-react';
 import { cn } from "@/lib/utils";

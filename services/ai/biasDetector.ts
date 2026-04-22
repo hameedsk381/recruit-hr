@@ -1,6 +1,8 @@
 import { hybridChatCompletion } from '../llmRouter';
 import { getMongoDb } from '../../utils/mongoClient';
 import { ObjectId } from 'mongodb';
+import { extractJsonFromResponse } from '../../utils/jsonParser';
+import { ToonEncoder } from '../../utils/toon';
 
 export interface JDLanguageFlag {
   phrase: string;
@@ -50,12 +52,12 @@ Return [] if no issues found.`;
       const raw = await hybridChatCompletion(
         'You are a bias detection model. Return valid JSON array only.',
         prompt,
-        { targetProvider: 'groq', max_tokens: 1024, temperature: 0.1 }
+        { targetProvider: 'groq', max_tokens: 1024, temperature: 0.1, response_format: { type: "json_object" } }
       );
-      const start = raw.indexOf('[');
-      const end = raw.lastIndexOf(']') + 1;
-      if (start === -1) return [];
-      return JSON.parse(raw.substring(start, end)) as JDLanguageFlag[];
+      const parsed = extractJsonFromResponse(raw);
+      if (Array.isArray(parsed)) return parsed as JDLanguageFlag[];
+      if (parsed && typeof parsed === 'object' && Array.isArray(parsed.flags)) return parsed.flags as JDLanguageFlag[];
+      return [];
     } catch {
       return [];
     }
@@ -101,13 +103,11 @@ Return [] if no issues found.`;
       }
     }
 
-    const funnelSummary = funnelAnalysis
-      .map(f => `${f.stage}: ${f.totalCandidates} candidates, ${f.passRate * 100}% pass rate`)
-      .join('\n');
+    const funnelSummary = ToonEncoder.encode(funnelAnalysis, 0, 'funnelAnalysis');
 
     const analysisPrompt = `Analyze this hiring funnel for adverse impact or bias patterns.
 
-Funnel:
+Funnel (TOON format):
 ${funnelSummary}
 
 Identify any statistically significant drop-offs that may indicate bias. Be conservative — flag only clear anomalies.
@@ -126,10 +126,9 @@ Return JSON only:
       const raw = await hybridChatCompletion(
         'You are a bias detection model. Return valid JSON only.',
         analysisPrompt,
-        { targetProvider: 'groq', max_tokens: 512, temperature: 0.1 }
+        { targetProvider: 'groq', max_tokens: 512, temperature: 0.1, response_format: { type: "json_object" } }
       );
-      const json = raw.substring(raw.indexOf('{'), raw.lastIndexOf('}') + 1);
-      const parsed = JSON.parse(json);
+      const parsed = extractJsonFromResponse(raw);
       adverseImpact = {
         detected: parsed.detected,
         analysis: parsed.analysis,

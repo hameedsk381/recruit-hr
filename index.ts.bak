@@ -20,7 +20,7 @@ import { validateRequestAuth } from "./middleware/authMiddleware";
 // Load environment variables
 config();
 
-const PORT = process.env.HR_TOOLS_PORT || 3001;
+const PORT = process.env.HR_TOOLS_PORT || 3005;
 
 // Initialize Redis client
 initializeRedisClient().catch(error => {

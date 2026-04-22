@@ -3,7 +3,7 @@ import { useTheme } from '../context/ThemeContext';
 import {
     ClipboardList, Users, LayoutDashboard, Calendar, Columns, Settings,
     LogOut, Clock, Sparkles, Briefcase, UserSearch, GitMerge, TrendingUp,
-    BookOpen, ShieldCheck, FileText, Moon, Sun, Monitor, LayoutGrid, GitBranch, BarChart3, UserPlus
+    BookOpen, ShieldCheck, FileText, Moon, Sun, Monitor, LayoutGrid, GitBranch, BarChart3, UserPlus, Globe
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ export default function Sidebar() {
 
     const menuItems = [
         { id: 'dashboard', label: isHM ? 'My Candidates' : 'Dashboard', icon: LayoutDashboard, category: 'Main' },
-        { id: 'history', label: 'Search History', icon: Clock, category: 'Main' },
+        { id: 'history', label: 'Campaign History', icon: Clock, category: 'Main' },
         { id: 'setup', label: 'Job Setup', icon: ClipboardList, category: 'Pipeline', check: !!job, hidden: isHM },
         { id: 'shortlist', label: 'Shortlist', icon: Users, category: 'Pipeline', disabled: !job, hidden: isHM },
         { id: 'pipeline', label: 'Hiring Pipeline', icon: Columns, category: 'Pipeline', disabled: !job, hidden: isHM },
@@ -24,11 +24,12 @@ export default function Sidebar() {
         { id: 'requisitions', label: 'Requisitions', icon: FileText, category: 'Hiring', hidden: isHM },
         { id: 'talent-pool', label: 'Talent Pool', icon: UserSearch, category: 'Hiring', hidden: isHM },
         { id: 'referrals', label: 'Referrals', icon: GitMerge, category: 'Hiring', hidden: isHM },
+        { id: 'sourcing', label: 'Outbound Sourcing', icon: Globe, category: 'Hiring', hidden: isHM },
         { id: 'onboarding', label: 'Onboarding', icon: UserPlus, category: 'Hiring', hidden: isHM },
         { id: 'predictions', label: 'Hiring Insights', icon: TrendingUp, category: 'Intelligence', hidden: isHM },
-        { id: 'reports', label: 'BI Analytics', icon: BarChart3, category: 'Intelligence', hidden: isHM },
+        { id: 'reports', label: 'Intelligence Hub', icon: BarChart3, category: 'Intelligence', hidden: isHM },
         { id: 'knowledge', label: 'Hiring Docs', icon: BookOpen, category: 'Intelligence', hidden: isHM },
-        { id: 'fairness', label: 'Bias Audit', icon: ShieldCheck, category: 'Intelligence', hidden: isHM },
+        { id: 'fairness', label: 'Fairness Audit', icon: ShieldCheck, category: 'Intelligence', hidden: isHM },
         { id: 'offers', label: 'Offers', icon: Briefcase, category: 'Hiring', hidden: isHM },
         { id: 'workflows', label: 'Automations', icon: GitBranch, category: 'Ecosystem', hidden: isHM },
         { id: 'marketplace', label: 'Marketplace', icon: LayoutGrid, category: 'Ecosystem', hidden: isHM },

@@ -1,5 +1,6 @@
 import { getMongoDb } from '../../utils/mongoClient';
 import { AuditService } from '../auditService';
+import { OutreachService } from '../outreachService';
 import { ObjectId } from 'mongodb';
 
 export interface NurtureStep {
@@ -14,8 +15,9 @@ export interface NurtureSequence {
   _id?: ObjectId;
   tenantId: string;
   name: string;
-  triggerEvent: 'added_to_pool' | 'job_match_found' | 'manual';
+  triggerEvent: 'added_to_pool' | 'job_match_found' | 'manual' | 'candidate_stage_changed';
   steps: NurtureStep[];
+  targetStage?: string; // Optional: e.g., "shortlisted" for candidate_stage_changed trigger
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -147,12 +149,48 @@ export class SequenceEngine {
     }
   }
 
+  static async triggerAutomatedOutreach(tenantId: string, event: string, payload: { profileId: string; stage?: string }): Promise<void> {
+    const db = getMongoDb();
+    const query: any = { tenantId, triggerEvent: event, isActive: true };
+    if (payload.stage) query.targetStage = payload.stage;
+
+    const sequences = await db.collection(SEQ_COLLECTION).find(query).toArray() as NurtureSequence[];
+    
+    for (const seq of sequences) {
+      if (seq._id) {
+        await SequenceEngine.enroll(tenantId, payload.profileId, seq._id.toString());
+      }
+    }
+  }
+
   private static async dispatchStep(enrollment: NurtureEnrollment, step: NurtureStep): Promise<void> {
     const db = getMongoDb();
     const profile = await db.collection('talent_profiles').findOne({ _id: enrollment.profileId });
     if (!profile) return;
 
+    const tenant = await db.collection('tenants').findOne({ tenantId: enrollment.tenantId });
+    const schedulingLink = tenant?.schedulingLink || '';
+
+    // Mock template fetching and variable injection
+    let body = `Hello ${profile.candidate?.name || 'Candidate'},\n\nThis is a follow-up regarding your application.`;
+    if (schedulingLink) {
+      body += `\n\nYou can book a technical screen here: ${schedulingLink}`;
+    }
+
     console.log(`[NurtureEngine] Dispatching step ${step.order} via ${step.channel} to ${profile.candidate?.email}`);
+
+    // Call OutreachService
+    if (step.channel === 'email' && profile.candidate?.email) {
+        await OutreachService.sendEmail({
+            tenantId: enrollment.tenantId,
+            profileId: profile._id.toString(),
+            toEmail: profile.candidate.email,
+            toName: profile.candidate.name || 'Candidate',
+            subject: `Next Steps: ${profile.candidate.name}`,
+            htmlBody: body.replace(/\n/g, '<br>'),
+            userId: 'SYSTEM_BOT'
+        });
+    }
 
     await AuditService.getInstance().log({
       tenantId: enrollment.tenantId, action: 'NURTURE_STEP_SENT',

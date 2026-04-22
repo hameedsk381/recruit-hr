@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import api from '../api/client';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, Clock, AlertTriangle, Brain, RefreshCw } from 'lucide-react';
+import { TrendingUp, Clock, AlertTriangle, Brain, RefreshCw, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PageGuide } from '@/components/PageGuide';
 
-type Tab = 'offer' | 'ttf' | 'retention' | 'weights';
+type Tab = 'offer' | 'ttf' | 'retention' | 'weights' | 'forecast';
 
 export default function Predictions() {
     const [tab, setTab] = useState<Tab>('offer');
@@ -100,6 +100,7 @@ export default function Predictions() {
         { id: 'offer' as Tab, label: 'Offer Acceptance', icon: TrendingUp },
         { id: 'ttf' as Tab, label: 'Time to Fill', icon: Clock },
         { id: 'retention' as Tab, label: 'Retention Risk', icon: AlertTriangle },
+        { id: 'forecast' as any, label: 'Executive Forecast', icon: BarChart3 },
         { id: 'weights' as Tab, label: 'AI Weights', icon: Brain },
     ];
 
@@ -206,6 +207,74 @@ export default function Predictions() {
                     </div>
                     <Button size="sm" onClick={predictRetention} disabled={loading || !retForm.tenure || !retForm.role}>{loading ? 'Predicting…' : 'Predict Retention Risk'}</Button>
                     {result && <RetentionResult r={result} />}
+                </div>
+            )}
+
+            {/* Executive Forecast */}
+            {tab === 'forecast' && (
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                        <p className="text-sm text-muted-foreground">Strategic pipeline health and ROI projections for leadership.</p>
+                        <Button size="sm" onClick={async () => {
+                            setLoading(true);
+                            try {
+                                const res = await api.getHiringForecast();
+                                if (res.success) {
+                                    setResult(res.forecast);
+                                }
+                            } catch (e) {
+                                console.error("Forecast failed", e);
+                            } finally {
+                                setLoading(false);
+                            }
+                        }} disabled={loading}>
+                            {loading ? 'Analyzing...' : 'Generate Strategic Forecast'}
+                        </Button>
+                    </div>
+
+                    {result && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-4">
+                            <div className="vercel-card border-indigo-500/20 bg-indigo-500/5 p-6 space-y-4">
+                                <div className="text-[10px] font-black uppercase tracking-widest text-indigo-500">Pipeline Health</div>
+                                <div className="text-4xl font-black text-indigo-600">{result.pipelineHealthScore}%</div>
+                                <div className="h-1.5 bg-indigo-200 rounded-full overflow-hidden">
+                                    <div className="h-full bg-indigo-600" style={{ width: `${result.pipelineHealthScore}%` }} />
+                                </div>
+                            </div>
+
+                            <div className="vercel-card border-emerald-500/20 bg-emerald-500/5 p-6 space-y-4">
+                                <div className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Avg Cost per Hire</div>
+                                <div className="text-4xl font-black text-emerald-600">${result.predictedCostPerHire.toLocaleString()}</div>
+                                <div className="text-xs text-emerald-600/80 font-medium tracking-tight">▼ 4.2% from last quarter</div>
+                            </div>
+
+                            <div className="md:col-span-2 vercel-card p-6 space-y-4">
+                                <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Strategic Insights</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <div className="text-[10px] font-bold text-rose-500 uppercase">Risk Factors</div>
+                                        <ul className="space-y-1">
+                                            {result.riskFactors.map((f: string, i: number) => (
+                                                <li key={i} className="text-xs text-muted-foreground flex gap-2">
+                                                    <span className="text-rose-400">!</span> {f}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="text-[10px] font-bold text-emerald-500 uppercase">Recommendations</div>
+                                        <ul className="space-y-1">
+                                            {result.recommendations.map((r: string, i: number) => (
+                                                <li key={i} className="text-xs text-muted-foreground flex gap-2">
+                                                    <span className="text-emerald-400">✓</span> {r}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 

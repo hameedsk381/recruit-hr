@@ -1,27 +1,41 @@
-import { OpenAI } from 'openai';
-import { Ollama } from 'ollama';
+import { pipeline, env } from '@xenova/transformers';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || 'sk-mock-key-for-dev' });
-const ollama = new Ollama({ host: process.env.OLLAMA_HOST || 'http://localhost:11434' });
+// Disable sending telemetry if necessary
+env.allowRemoteModels = true;
+env.localModelPath = './models';
+
+// Singleton instance for the embedding pipeline
+class PipelineSingleton {
+  static task = 'feature-extraction';
+  static model = 'Xenova/all-MiniLM-L6-v2';
+  static instance: any = null;
+
+  static async getInstance(progress_callback?: Function) {
+    if (this.instance === null) {
+      // Create pipeline instance
+      this.instance = await pipeline(this.task as any, this.model, { progress_callback });
+    }
+    return this.instance;
+  }
+}
 
 export class EmbeddingService {
   /**
-   * Hybrid Embedding function
-   * Uses OpenAI by default, falls back to Ollama for local/PII requirements
+   * Generates vector embeddings using sentence-transformers/all-MiniLM-L6-v2.
+   * Produces 384-dimensional vectors fully locally without external APIs.
    */
-  static async getEmbedding(text: string, useLocal = false): Promise<number[]> {
-    if (useLocal) {
-      const response = await ollama.embeddings({
-        model: process.env.OLLAMA_EMBEDDING_MODEL || 'mxbai-embed-large',
-        prompt: text,
-      });
-      return response.embedding;
+  static async getEmbedding(text: string): Promise<number[]> {
+    try {
+      const extractor = await PipelineSingleton.getInstance();
+      
+      // Compute embeddings
+      const output = await extractor(text, { pooling: 'mean', normalize: true });
+      
+      // Output is a Tensor, we need to convert it to a standard JS array
+      return Array.from(output.data);
+    } catch (error) {
+      console.error('[EmbeddingService] Error generating embedding:', error);
+      throw error;
     }
-
-    const response = await openai.embeddings.create({
-      model: 'text-embedding-3-small',
-      input: text,
-    });
-    return response.data[0].embedding;
   }
 }

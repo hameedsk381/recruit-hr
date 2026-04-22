@@ -4,6 +4,7 @@ import { getLLMCache, setLLMCache } from "../utils/llmCache";
 import { getPrompt } from "./promptRegistry";
 import { createHash } from "crypto";
 import { getMongoDb } from "../utils/mongoClient";
+import { extractJsonFromResponse } from "../utils/jsonParser";
 
 // Interface for resume data
 export interface ResumeData {
@@ -15,7 +16,7 @@ export interface ResumeData {
   address?: string;
   nationality?: string;
   skills: string[];
-  experience: string[];
+  experience: any[];
   education: string[];
   certifications: string[];
   industrialExperience: string[];
@@ -57,190 +58,6 @@ export function applyBlindMode(resume: ResumeData, settings: BlindScreeningSetti
 
 // ... (Prompt constant removed in favor of Prompt Registry)
 
-// Function to extract JSON from AI response
-function extractJsonFromResponse(response: string): any {
-  // First try to parse the entire response
-  try {
-    return JSON.parse(response);
-  } catch (e) {
-    // Clean the response by removing markdown code blocks if present
-    let cleanResponse = response.trim();
-
-    // Remove markdown code block markers if present
-    if (cleanResponse.startsWith("```json")) {
-      cleanResponse = cleanResponse.substring(7);
-    }
-    if (cleanResponse.startsWith("```")) {
-      cleanResponse = cleanResponse.substring(3);
-    }
-    if (cleanResponse.endsWith("```")) {
-      cleanResponse = cleanResponse.substring(0, cleanResponse.length - 3);
-    }
-
-    cleanResponse = cleanResponse.trim();
-
-    // Look for JSON in the response by finding the first opening brace
-    const jsonStart = cleanResponse.indexOf("{");
-
-    if (jsonStart !== -1) {
-      // Extract everything from the first opening brace to the last closing brace
-      const jsonEnd = cleanResponse.lastIndexOf("}") + 1;
-      if (jsonEnd > jsonStart) {
-        let jsonString = cleanResponse.substring(jsonStart, jsonEnd);
-
-        // Try to parse the extracted JSON
-        try {
-          return JSON.parse(jsonString);
-        } catch (e2) {
-          // If parsing fails, try to fix common issues
-
-          // Count opening and closing braces to see if we're missing any
-          const openBraces = (jsonString.match(/\{/g) || []).length;
-          const closeBraces = (jsonString.match(/\}/g) || []).length;
-          const openBrackets = (jsonString.match(/\[/g) || []).length;
-          const closeBrackets = (jsonString.match(/\]/g) || []).length;
-
-          // Add missing closing brackets first
-          let missingBrackets = openBrackets - closeBrackets;
-          while (missingBrackets > 0) {
-            jsonString += "]";
-            missingBrackets--;
-          }
-
-          // Then add missing closing braces
-          let missingBraces = openBraces - closeBraces;
-          while (missingBraces > 0) {
-            jsonString += "}";
-            missingBraces--;
-          }
-
-          try {
-            return JSON.parse(jsonString);
-          } catch (e3) {
-            // Try a more aggressive approach - find the last complete array or object
-            const lastArrayStart = jsonString.lastIndexOf("[");
-            const lastArrayEnd = jsonString.lastIndexOf("]");
-            const lastObjectStart = jsonString.lastIndexOf("{");
-            const lastObjectEnd = jsonString.lastIndexOf("}");
-
-            // If we have an unclosed array, try to close it properly
-            if (lastArrayStart > lastArrayEnd) {
-              // Find where the array should end (look for the last string or object in the array)
-              const lastQuote = jsonString.lastIndexOf('"');
-              const lastBrace = jsonString.lastIndexOf('}');
-
-              // Close the array at the appropriate position
-              const arrayEndPos = Math.max(lastQuote, lastBrace) + 1;
-              if (arrayEndPos > lastArrayStart) {
-                jsonString = jsonString.substring(0, arrayEndPos) + "]" + jsonString.substring(arrayEndPos);
-              }
-            }
-
-            // If we have an unclosed object, try to close it properly
-            if (lastObjectStart > lastObjectEnd) {
-              // Find where the object should end (look for the last quote or bracket)
-              const lastQuote = jsonString.lastIndexOf('"');
-              const lastBracket = jsonString.lastIndexOf(']');
-
-              // Close the object at the appropriate position
-              const objectEndPos = Math.max(lastQuote, lastBracket) + 1;
-              if (objectEndPos > lastObjectStart) {
-                jsonString = jsonString.substring(0, objectEndPos) + "}" + jsonString.substring(objectEndPos);
-              }
-            }
-
-            try {
-              return JSON.parse(jsonString);
-            } catch (e4) {
-              // If we still can't parse, throw the original error
-              throw e;
-            }
-          }
-        }
-      } else {
-        // If we can't find a proper closing brace, try to construct a valid JSON
-        // by finding the last complete object or array and closing it properly
-        let jsonString = cleanResponse.substring(jsonStart);
-
-        // Try to fix common JSON issues
-        // Add missing closing brackets/braces
-        const openBraces = (jsonString.match(/\{/g) || []).length;
-        const closeBraces = (jsonString.match(/\}/g) || []).length;
-        const openBrackets = (jsonString.match(/\[/g) || []).length;
-        const closeBrackets = (jsonString.match(/\]/g) || []).length;
-
-        // Add missing closing brackets first
-        let missingBrackets = openBrackets - closeBrackets;
-        while (missingBrackets > 0) {
-          jsonString += "]";
-          missingBrackets--;
-        }
-
-        // Then add missing closing braces
-        let missingBraces = openBraces - closeBraces;
-        while (missingBraces > 0) {
-          jsonString += "}";
-          missingBraces--;
-        }
-
-        try {
-          return JSON.parse(jsonString);
-        } catch (e2) {
-          // If we still can't parse, throw the original error
-          // FINAL AGGRESSIVE RECOVERY: Patch incomplete arrays/objects wherever detected
-          let patched = jsonString;
-          let openSq: number[] = [];
-          let openCurl: number[] = [];
-          for (let i = 0; i < patched.length; i++) {
-            if (patched[i] === '[') openSq.push(i);
-            else if (patched[i] === ']') openSq.pop();
-            if (patched[i] === '{') openCurl.push(i);
-            else if (patched[i] === '}') openCurl.pop();
-          }
-          // Close any unfinished arrays inside objects or array fields
-          while (openSq.length) {
-            const startIdx = openSq.pop();
-            // Find next non-whitespace after the array start
-            let closeIdx = startIdx !== undefined ? (startIdx as number) + 1 : 1;
-            while (closeIdx < patched.length && (patched[closeIdx] === ' ' || patched[closeIdx] === '\n' || patched[closeIdx] === '\t')) closeIdx++;
-            // If right after is a closing curly brace or end, insert before it; otherwise, insert at closeIdx
-            if (patched[closeIdx] === '}') {
-              patched = patched.slice(0, closeIdx) + ']' + patched.slice(closeIdx);
-            } else {
-              patched = patched.slice(0, closeIdx) + ']' + patched.slice(closeIdx);
-            }
-          }
-          while (openCurl.length) {
-            const startIdx = openCurl.pop();
-            let closeIdx = startIdx !== undefined ? startIdx + 1 : 1;
-            while (closeIdx < patched.length && (patched[closeIdx] === ' ' || patched[closeIdx] === '\n' || patched[closeIdx] === '\t')) closeIdx++;
-            if (patched[closeIdx] === ']') {
-              patched = patched.slice(0, closeIdx) + '}' + patched.slice(closeIdx);
-            } else {
-              patched = patched.slice(0, closeIdx) + '}' + patched.slice(closeIdx);
-            }
-          }
-          try {
-            return JSON.parse(patched);
-          } catch (finalPatchErr) { }
-          // If we still can't parse, throw the original error
-          const opens = [cleanResponse.split('{').length - 1, cleanResponse.split('[').length - 1];
-          const closes = [cleanResponse.split('}').length - 1, cleanResponse.split(']').length - 1];
-          let fixed = cleanResponse;
-          while (closes[1] < opens[1]) { fixed += ']'; closes[1]++; }
-          while (closes[0] < opens[0]) { fixed += '}'; closes[0]++; }
-          try {
-            return JSON.parse(fixed);
-          } catch (_) {
-            throw e;
-          }
-        }
-      }
-    }
-    // If no JSON-like structure found, throw the original error
-    throw e;
-  }
-}
 
 // Helper function to calculate years between dates
 function calculateYearsBetweenDates(startDate: string, endDate: string): number {
@@ -532,10 +349,11 @@ export async function extractRawResumeData(buffer: Buffer): Promise<ResumeData> 
     // and limited tokens to reduce costs and improve speed
     console.log('[ResumeExtractor] Calling Groq API...');
     const response = await groqChatCompletion(
-      "You are an expert HR assistant specializing in extracting information from resumes.",
+      "You are an expert HR assistant specializing in extracting information from resumes. Respond in valid JSON.",
       `${promptConfig.template}\n\nResume text:\n${text.substring(0, 10000)}`,
       promptConfig.modelConfig.temperature,
-      promptConfig.modelConfig.maxTokens
+      promptConfig.modelConfig.maxTokens,
+      { type: "json_object" }
     );
 
     console.log(`[ResumeExtractor] Groq API response length: ${response.length} characters`);

@@ -1,6 +1,6 @@
 import { expect, test, describe } from "bun:test";
 
-const BASE_URL = "http://localhost:3001";
+const BASE_URL = "http://localhost:3005";
 
 describe("API Versioning Integration", () => {
   test("GET /health returns versioning headers", async () => {

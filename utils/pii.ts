@@ -16,8 +16,22 @@ export class PIIManager {
 
         // Mask Phone Numbers (Basic pattern for global formats)
         masked = masked.replace(/(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g, '[PHONE_HIDDEN]');
+        
+        // Mask SSN
+        masked = masked.replace(/\b\d{3}[-.\s]?\d{2}[-.\s]?\d{4}\b/g, '[SSN_HIDDEN]');
 
         return masked;
+    }
+
+    /**
+     * Checks if a string contains obvious PII like email, phone, SSN
+     */
+    static containsPII(text: string): boolean {
+        const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
+        const phoneRegex = /(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/;
+        const ssnRegex = /\b\d{3}[-.\s]?\d{2}[-.\s]?\d{4}\b/;
+        
+        return emailRegex.test(text) || phoneRegex.test(text) || ssnRegex.test(text);
     }
 
     /**

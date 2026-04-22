@@ -90,6 +90,20 @@ export async function jdExtractorStreamingHandler(req: Request): Promise<Respons
           // Extract job description data
           const jdData = await extractJobDescriptionData(Buffer.from(buffer));
           
+          // Cross-verify with heuristic validator to prevent LLM bypass
+          const { validateJobDescription } = await import('../services/jdValidator');
+          const validation = validateJobDescription(jdData);
+          
+          if (validation.documentType === 'resume') {
+            controller.enqueue(new TextEncoder().encode(formatSSE({ 
+              success: false, 
+              error: 'DOCUMENT_IS_RESUME',
+              message: 'The uploaded document appears to be a candidate resume, not a job description.'
+            }, 'error')));
+            controller.close();
+            return;
+          }
+          
           controller.enqueue(new TextEncoder().encode(formatSSE({ 
             status: 'processing', 
             message: 'Text extracted. Analyzing with AI...'

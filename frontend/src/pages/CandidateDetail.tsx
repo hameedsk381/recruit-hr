@@ -20,7 +20,8 @@ import {
     ShieldAlert,
     MoreHorizontal,
     Activity,
-    Database
+    Database,
+    FileText
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
@@ -35,6 +36,8 @@ export default function CandidateDetail() {
         setView,
         batchId,
         updateCandidateStage,
+        setOfferDraft,
+        job
     } = useApp();
 
 
@@ -64,6 +67,16 @@ export default function CandidateDetail() {
 
     const { profile, assessment } = candidate;
 
+    const handleGenerateOffer = () => {
+        setOfferDraft({
+            candidateId: candidate.id,
+            jobId: job?.id || '',
+            candidateName: profile.name,
+            jobTitle: job?.title || ''
+        });
+        setView('offers');
+    };
+
     return (
         <div className="space-y-12 animate-in fade-in duration-500 pb-24">
             {/* Minimalist Header */}
@@ -79,6 +92,11 @@ export default function CandidateDetail() {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
+                    {candidate.stage === 'hm_approved' && (
+                        <Button className="h-9 font-bold bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleGenerateOffer}>
+                            <FileText size={16} className="mr-2" /> Generate Offer
+                        </Button>
+                    )}
                     <Button variant="outline" size="sm" className={cn("h-9 font-bold", candidate.pinned && "bg-black text-white")} onClick={() => pinCandidate(candidate.id)}>
                         <Pin size={16} className={cn("mr-2", candidate.pinned && "fill-current")} />
                         {candidate.pinned ? 'Pinned' : 'Pin Profile'}
@@ -110,22 +128,25 @@ export default function CandidateDetail() {
                                 )}>
                                     <span className="text-4xl font-black">{assessment.fit_assessment.overall_fit === 'high' ? 'A+' : assessment.fit_assessment.overall_fit === 'medium' ? 'B' : 'C'}</span>
                                 </div>
-                                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Match Rating</span>
+                                <div className="space-y-1 text-center">
+                                    <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block">Suitability Score</span>
+                                    <span className="text-xl font-black text-foreground">{Math.round(Number(assessment.matchScore) || 0)}%</span>
+                                </div>
                             </div>
                         </div>
 
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-6 pt-6 border-t border-border/50">
                             <div className="space-y-1.5">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"><Clock size={12} /> Industrial Tenure</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"><Clock size={12} /> Professional Experience</p>
                                 <p className="text-xl font-bold tabular-nums text-foreground">{profile.experience_estimate?.total_years || '0'} Years</p>
                             </div>
                             <div className="space-y-1.5">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"><Activity size={12} /> Competency Cloud</p>
-                                <p className="text-xl font-bold tabular-nums text-foreground">{profile.extracted_skills.length} Nodes</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"><Activity size={12} /> Expertise Depth</p>
+                                <p className="text-xl font-bold tabular-nums text-foreground">{profile.extracted_skills.length} Skills Identified</p>
                             </div>
                             <div className="space-y-1.5">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"><ShieldAlert size={12} /> Compliance ID</p>
-                                <p className="text-lg font-mono text-muted-foreground">{candidate.id.split('-')[0]}</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"><ShieldAlert size={12} /> Reference ID</p>
+                                <p className="text-lg font-mono text-muted-foreground">{candidate.id.split('-')[0].toUpperCase()}</p>
                             </div>
                         </div>
                     </div>
@@ -134,7 +155,7 @@ export default function CandidateDetail() {
                     <div className="space-y-10">
                         <section className="space-y-4">
                             <h3 className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2 text-foreground">
-                                <Sparkles size={16} /> Semantic Assessment
+                                <Sparkles size={16} /> Executive Summary
                             </h3>
                             <div className="vercel-card bg-muted/40 border-border/50 shadow-sm">
                                 <p className="text-lg font-medium leading-relaxed italic text-foreground">"{assessment.one_line_summary}"</p>
@@ -147,7 +168,7 @@ export default function CandidateDetail() {
                         {(candidate as any).screeningSummary && (
                             <section className="space-y-4 animate-in slide-in-from-bottom-2 duration-700">
                                 <h3 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2 text-indigo-600">
-                                    <Mic size={16} /> AI Technical Evaluator Insights
+                                    <Mic size={16} /> Structured Evaluation Insights
                                 </h3>
                                 <div className="vercel-card bg-indigo-500/5 border-indigo-500/10 shadow-lg shadow-indigo-500/10 p-8 space-y-4">
                                     <div className="flex items-start gap-4">
@@ -162,8 +183,8 @@ export default function CandidateDetail() {
                                                 {(candidate as any).screeningSummary}
                                             </div>
                                             <div className="flex items-center gap-2 pt-4 border-t border-indigo-200">
-                                                <Badge className="bg-indigo-600 text-white border-transparent">Verified Transcript</Badge>
-                                                <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Sovereign Identity Protection Active</span>
+                                                <Badge className="bg-indigo-600 text-white border-transparent">Validated Feedback</Badge>
+                                                <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Verified Recruitment Intelligence</span>
                                             </div>
                                         </div>
                                     </div>
@@ -174,7 +195,7 @@ export default function CandidateDetail() {
                         <div className="grid md:grid-cols-2 gap-8">
                             <div className="space-y-4">
                                 <h4 className="text-[10px] font-semibold uppercase tracking-wider flex items-center gap-2 text-emerald-600">
-                                    <ThumbsUp size={14} /> Critical Strengths
+                                    <ThumbsUp size={14} /> Strategic Strengths
                                 </h4>
                                 <div className="space-y-3">
                                     {assessment.strengths.map((s, i) => (
@@ -187,7 +208,7 @@ export default function CandidateDetail() {
                             </div>
                             <div className="space-y-4">
                                 <h4 className="text-[10px] font-semibold uppercase tracking-wider flex items-center gap-2 text-amber-600">
-                                    <AlertCircle size={14} /> Strategic Gaps
+                                    <AlertCircle size={14} /> Areas for Exploration
                                 </h4>
                                 <div className="space-y-3">
                                     {assessment.gaps_and_risks.map((r, i) => (
@@ -202,7 +223,7 @@ export default function CandidateDetail() {
 
                         <section className="space-y-4 pb-8">
                             <h3 className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2 text-foreground">
-                                <Target size={16} /> Requirement Alignment
+                                <Target size={16} /> Job Alignment Analysis
                             </h3>
                             <div className="vercel-card !p-0 divide-y divide-border/50 shadow-sm overflow-hidden">
                                 {assessment.skill_match_breakdown.map((s, i) => (
@@ -230,12 +251,12 @@ export default function CandidateDetail() {
                     <div className="vercel-card !p-0 overflow-hidden bg-card/60 shadow-sm border-border/70 backdrop-blur-md">
                         <div className="p-4 border-b border-border/50 bg-muted/40">
                             <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                                <Database size={12} /> Ecosystem Sync
+                                <Database size={12} /> ATS Integration
                             </h3>
                         </div>
                         <div className="p-5 space-y-4">
                             <p className="text-xs text-muted-foreground font-medium leading-relaxed">
-                                Deploy this assessment blueprint to your talent operating system.
+                                Sync this candidate profile with your internal applicant tracking system.
                             </p>
                             <div className="grid grid-cols-1 gap-2.5">
                                 <Button 
@@ -282,7 +303,7 @@ export default function CandidateDetail() {
 
                     <div className="vercel-card !p-5 space-y-5 bg-card shadow-sm border-border/70">
                         <h4 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                            <Activity size={14} /> Workflow Stage
+                            <Activity size={14} /> Hiring Progression
                         </h4>
                         <div className="grid grid-cols-2 xl:grid-cols-3 gap-2">
                             {(['applied', 'shortlisted', 'technical', 'culture', 'pending', 'offer'] as const).map(s => (
@@ -296,7 +317,7 @@ export default function CandidateDetail() {
                                             : "bg-muted/30 text-muted-foreground border-border/50 hover:border-border hover:bg-muted/70 hover:text-foreground"
                                     )}
                                 >
-                                    {s}
+                                    {s === 'technical' ? 'Interview' : s === 'culture' ? 'Culture' : s}
                                 </button>
                             ))}
                         </div>
@@ -304,7 +325,7 @@ export default function CandidateDetail() {
 
                     <div className="vercel-card !p-5 space-y-4 bg-card shadow-sm border-border/70">
                         <h4 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                            <MoreHorizontal size={14} /> Contact Nodes
+                            <MoreHorizontal size={14} /> Contact Details
                         </h4>
                         <div className="space-y-2.5">
                             {profile.email && <div className="text-xs font-medium border border-border/60 rounded-md px-3.5 py-2.5 flex items-center justify-between hover:bg-muted/40 cursor-pointer truncate transition-colors text-foreground"><span className="truncate pr-4">{profile.email}</span><Mail size={14} className="opacity-40 shrink-0" /></div>}
@@ -318,14 +339,14 @@ export default function CandidateDetail() {
                             variant="outline" 
                             className="w-full justify-start h-10 rounded-md text-xs font-semibold text-destructive border-destructive/20 bg-destructive/5 hover:bg-destructive hover:text-destructive-foreground transition-all group"
                             onClick={async () => {
-                                if (confirm("DPDP: Irreversibly erase this profile's PII and interview traces?")) {
+                                if (confirm("Data Privacy: Permanently erase all candidate data and interview history?")) {
                                     await api.deleteCandidateData(candidate.id);
                                     setView('shortlist');
                                 }
                             }}
                         >
                             <ShieldAlert size={14} className="mr-2 opacity-70 group-hover:opacity-100" /> 
-                            Right to Erasure (DPDP)
+                            Request Profile Erasure
                         </Button>
                     </div>
                 </div>

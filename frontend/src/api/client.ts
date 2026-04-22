@@ -1,6 +1,15 @@
 // Enhanced API client for talentacquisation.ai with JWT support and Async Workflows
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const getApiBaseUrl = () => {
+    if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+    const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+        return `http://${hostname}:3005`;
+    }
+    return 'http://localhost:3005';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 interface RequestOptions {
     method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
@@ -125,6 +134,9 @@ export const api = {
     },
 
     // Job Status Polling
+    listCampaigns: async () => {
+        return request<{ success: boolean; batches: any[] }>('/campaigns');
+    },
     getJobStatus: async (params: { jobId?: string, batchId?: string }) => {
         const query = new URLSearchParams(params as any).toString();
         return request<any>(`/job-status?${query}`);
@@ -138,6 +150,22 @@ export const api = {
     },
 
     // Analytics
+    async listIntegrations() {
+        return apiClient.get('/integrations');
+    },
+
+    async getIntegrationStatus(id: string) {
+        return apiClient.get(`/integrations/${id}/status`);
+    },
+
+    async listATSJobs(integrationId: string) {
+        return apiClient.get(`/integrations/${integrationId}/jobs`);
+    },
+
+    async pushATSScore(integrationId: string, data: { atsCandidateId: string, score: number, summary: string, jobId?: string }) {
+        return apiClient.post(`/integrations/${integrationId}/push-score`, data);
+    },
+
     getAnalytics: async () => {
         return request<any>('/analytics');
     },
@@ -234,7 +262,14 @@ export const api = {
     },
 
     extractJD: async (file: File) => {
-        return uploadFiles('/extract-jd', { jobDescription: file });
+        return uploadFiles('/extract-jd', { jobDescription: file }) as Promise<any>;
+    },
+
+    extractJDText: async (text: string) => {
+        return request<{ success: boolean; data: any }>('/extract-jd-text', {
+            method: 'POST',
+            body: { text }
+        });
     },
 
     // Recruiter State Persistence
@@ -324,6 +359,19 @@ export const api = {
     // Phase 4: Public Candidate Portal
     getPublicJobs: async (tenantId: string) => {
         return request<{ success: boolean; jobs: any[] }>(`/public/jobs?tenantId=${tenantId}`);
+    },
+
+    matchMyResume: async (tenantId: string, resume: File) => {
+        const formData = new FormData();
+        formData.append('tenantId', tenantId);
+        formData.append('resume', resume);
+
+        const response = await fetch(`${API_BASE_URL}/public/match-my-resume`, {
+            method: 'POST',
+            body: formData,
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
     },
 
     publicApply: async (formData: FormData) => {
@@ -486,6 +534,32 @@ export const api = {
 
     initiateOnboarding: (data: any) =>
         request<{ success: boolean; id: string }>('/v1/onboarding/initiate', { method: 'POST', body: data }),
+
+    draftOutreach: async (data: { jobContext: any, candidateProfile: any, assessment: any, type: 'invite' | 'reject' | 'nurture' }) => {
+        return request<{ success: boolean; draft: { subject: string; body: string } }>('/draft-outreach', {
+            method: 'POST',
+            body: data
+        });
+    },
+
+    getSourcingList: async () => {
+        return request<{ success: boolean; prospects: any[] }>('/sourcing/list');
+    },
+
+    getHiringForecast: async (jobId?: string) => {
+        return request<{ success: boolean; forecast: any }>(`/analytics/forecast${jobId ? '?jobId=' + jobId : ''}`);
+    },
+
+    getDynamicAssessment: async (batchId: string) => {
+        return request<{ success: boolean; problem: any }>(`/assessments/dynamic?batchId=${batchId}`);
+    },
+
+    submitAssessment: async (data: { problemId: string, submission: string, candidateId: string, batchId: string }) => {
+        return request<{ success: boolean; evaluation: any }>('/assessments/submit', {
+            method: 'POST',
+            body: data
+        });
+    },
 };
 
 export default api;

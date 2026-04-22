@@ -21,6 +21,13 @@ export interface ExperienceExpectation {
     domain_specific?: string;
 }
 
+export interface WorkflowStage {
+    id: string;
+    label: string;
+    type: 'screening' | 'technical' | 'culture' | 'decision' | 'offer' | 'onboarding';
+    order: number;
+}
+
 export interface JobDescription {
     id: string;
     title: string;
@@ -30,7 +37,11 @@ export interface JobDescription {
     role_context?: string;
     location?: string;
     employment_type?: string;
+    industry?: string;
     ai_assumptions?: string[];
+    atsJobId?: string;
+    integrationId?: string;
+    workflow?: WorkflowStage[];
 }
 
 // ==================== Candidate Profile Types ====================
@@ -66,6 +77,7 @@ export interface CandidateProfile {
     experience_estimate?: ExperienceEstimate;
     recent_role?: RecentRole;
     certifications?: string[];
+    atsCandidateId?: string;
 }
 
 // ==================== Assessment Types ====================
@@ -113,11 +125,12 @@ export interface CandidateAssessment {
     skill_match_breakdown: SkillMatch[];
     interview_focus_areas: InterviewFocusArea[];
     recruiter_notes?: RecruiterNotes;
+    matchScore: number;
 }
 
 // ==================== Shortlist Types ====================
 
-export type PipelineStage = 'applied' | 'shortlisted' | 'technical' | 'culture' | 'pending' | 'offer' | 'hm_approved' | 'hm_rejected';
+export type PipelineStage = 'applied' | 'shortlisted' | 'technical' | 'culture' | 'pending' | 'offer' | 'hm_approved' | 'hm_rejected' | (string & {});
 
 export interface ShortlistCandidate {
     id: string;
@@ -128,6 +141,7 @@ export interface ShortlistCandidate {
     removed: boolean;
     removal_reason?: string;
     stage?: PipelineStage;
+    stageChangedAt?: string;
     hmDecision?: 'approved' | 'rejected';
     hmNotes?: string;
 }
@@ -199,6 +213,7 @@ export interface JDExtractionResponse {
         responsibilities?: string[];
         location?: string;
         employmentType?: string;
+        industry?: string;
     };
     error?: string;
 }

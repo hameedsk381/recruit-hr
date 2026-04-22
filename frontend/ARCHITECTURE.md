@@ -201,7 +201,7 @@ interface AppState {
 
 ## API Integration
 
-The frontend connects to the backend at `VITE_API_URL` (default: `http://localhost:3001`).
+The frontend connects to the backend at `VITE_API_URL` (default: `http://localhost:3005`).
 
 ### Key Endpoints Used:
 

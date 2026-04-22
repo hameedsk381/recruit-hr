@@ -45,7 +45,8 @@ export default function Interviews() {
         candidates,
         setView,
         addInterview,
-        selectCandidate
+        selectCandidate,
+        job
     } = useApp();
 
     const [rescheduleData, setRescheduleData] = useState<{ id: string, candidateId: string } | null>(null);
@@ -177,8 +178,8 @@ export default function Interviews() {
                 candidateId: scheduleCandidate.id,
                 candidateName: scheduleCandidate.profile.name,
                 candidateEmail: scheduleCandidate.profile.email || 'candidate@example.com',
-                jobId: 'current-job',
-                jobTitle: 'Open Position',
+                jobId: job?.id || 'current-job',
+                jobTitle: job?.title || 'Open Position',
                 startTime,
                 type: scheduleType,
                 platform: schedulePlatform,

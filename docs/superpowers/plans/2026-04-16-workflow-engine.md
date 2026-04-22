@@ -61,10 +61,10 @@ await WorkflowEngine.execute(tenantId, type, payload);
 - [ ] **Step 3: Verify the server still starts**
 
 ```bash
-cd /home/cognitbotz/recruit-hr && bun run index.ts &>/tmp/wf-check.log & sleep 4 && grep -E "Ready|Error|Cannot" /tmp/wf-check.log && kill $(lsof -ti:3001) 2>/dev/null
+cd /home/cognitbotz/recruit-hr && bun run index.ts &>/tmp/wf-check.log & sleep 4 && grep -E "Ready|Error|Cannot" /tmp/wf-check.log && kill $(lsof -ti:3005) 2>/dev/null
 ```
 
-Expected: `[Index] Platform Ready. Serving on port 3001` — no import errors.
+Expected: `[Index] Platform Ready. Serving on port 3005` — no import errors.
 
 - [ ] **Step 4: Commit**
 
@@ -474,7 +474,7 @@ import { WorkflowEngine } from './workflow/workflowEngine';
 - [ ] **Step 2: Verify server starts cleanly**
 
 ```bash
-cd /home/cognitbotz/recruit-hr && kill $(lsof -ti:3001) 2>/dev/null; sleep 1 && ALLOWED_ORIGINS="https://app.reckruit.ai" bun run index.ts &>/tmp/wf2.log & sleep 5 && grep -E "Ready|Error|Cannot|workflow" /tmp/wf2.log && kill $(lsof -ti:3001) 2>/dev/null
+cd /home/cognitbotz/recruit-hr && kill $(lsof -ti:3005) 2>/dev/null; sleep 1 && ALLOWED_ORIGINS="https://app.reckruit.ai" bun run index.ts &>/tmp/wf2.log & sleep 5 && grep -E "Ready|Error|Cannot|workflow" /tmp/wf2.log && kill $(lsof -ti:3005) 2>/dev/null
 ```
 
 Expected: `[Workflow] Background Workers Ready` and `[Index] Platform Ready`.
@@ -1045,10 +1045,10 @@ cd /home/cognitbotz/recruit-hr && git add frontend/src/pages/Workflows.tsx && gi
 - [ ] **Step 1: Start server and verify all workflow routes respond**
 
 ```bash
-cd /home/cognitbotz/recruit-hr && kill $(lsof -ti:3001) 2>/dev/null; sleep 1 && ALLOWED_ORIGINS="https://app.reckruit.ai" bun run index.ts &>/tmp/wf-final.log & sleep 5 && grep -E "Ready|Error|Cannot" /tmp/wf-final.log
+cd /home/cognitbotz/recruit-hr && kill $(lsof -ti:3005) 2>/dev/null; sleep 1 && ALLOWED_ORIGINS="https://app.reckruit.ai" bun run index.ts &>/tmp/wf-final.log & sleep 5 && grep -E "Ready|Error|Cannot" /tmp/wf-final.log
 ```
 
-Expected: `[Index] Platform Ready. Serving on port 3001`
+Expected: `[Index] Platform Ready. Serving on port 3005`
 
 - [ ] **Step 2: Verify existing test suite passes**
 

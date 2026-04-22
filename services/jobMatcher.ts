@@ -5,88 +5,49 @@ import { getLLMCache, setLLMCache } from "../utils/llmCache";
 import { createHash, randomUUID } from "crypto";
 import { logger } from "../utils/logger";
 import { PIIManager } from "../utils/pii";
+import { extractJsonFromResponse } from "../utils/jsonParser";
+import { ToonEncoder } from "../utils/toon";
 
-const JOB_MATCHING_PROMPT = `You are an expert HR consultant specializing in job-resume matching analysis.
-Analyze the provided job description and resume, focusing specifically on ROLE RELEVANCE, SKILLSET MATCHING, and EXPERIENCE QUALITY.
+const JOB_MATCHING_PROMPT = `You are an expert HR consultant specializing in cross-industry talent matching.
+Analyze the provided job description and resume, focusing on CORE COMPETENCIES, DOMAIN RELEVANCE, and EXPERIENCE QUALITY.
 
-CRITICAL EVALUATION CRITERIA:
-1. Role Relevance: How well does the candidate's background align with the job role?
-2. Technical Skills Match: What percentage of required technical skills does the candidate possess?
-3. Experience Level Alignment: Does the candidate have appropriate experience for the role level?
-4. Domain Expertise: Does the candidate have relevant industry/domain experience?
-5. Recent Experience Quality: Focus on the candidate's most recent company experience and its relevance
-6. Experience Threshold Compliance: Does the candidate meet the minimum required years of experience?
+CRITICAL EVALUATION:
+1. Core Fit: How well does the candidate's functional background align with the industry and role?
+2. Skills Match: What percentage of mandatory skills (technical or functional) are present?
+3. Domain Mastery: Does the candidate have relevant industry experience (e.g., Retail, Manufacturing, Tech)?
+4. Seniority Alignment: Does the years of experience match the role's seniority requirements?
+5. Recent Track Record: Assessment of the candidate's most recent company and impact.
 
-SCORING GUIDELINES:
-- Score 0-100 with the following breakdown:
-- Score 85-100: Excellent match, highly relevant
-- Score 70-84: Good match with minor gaps
-- Score 60-69: Basic relevance with some skill gaps
-- Score 0-59: Poor match or doesn't meet minimum requirements
+SCORING:
+- 0-59: Poor match / Unqualified
+- 60-74: Potential match with gaps
+- 75-100: Strong match
 
-EXPERIENCE EVALUATION FOCUS:
-- Pay special attention to the candidate's most recent work experience
-- Evaluate if the required years of domain experience are met or exceeded
-- If the job requires X years of experience, candidates MUST have at least X years
-- Recent relevant experience should be weighted more heavily than older experience
-- For domain-specific skills (e.g., Python), only count experience if it's in the relevant domain
-
-Return a JSON response with this structure:
+Return a JSON response:
 {
-  "Id": "Unique identifier for this match analysis",
+  "Id": "unique_id",
   "Resume Data": {
-    "Job Title": "Job title from the job description",
-    "Matching Percentage": "Overall matching percentage as a string (e.g., '85')",
-    "college_name": null,
-    "company_names": [],
-    "degree": null,
-    "designation": null,
-    "email": "Candidate email",
-    "experience": "Years of experience or experience details",
-    "mobile_number": "Candidate phone number",
-    "name": "Candidate name",
-    "no_of_pages": null,
-    "skills": ["List of candidate skills"],
-    "certifications": ["List of candidate certifications"],
-    "total_experience": ["List of work experiences"]
+    "Job Title": "target_role",
+    "Matching Percentage": "string_0_100",
+    "name": "string",
+    "email": "string",
+    "experience": "years",
+    "skills": ["list"],
+    "certifications": ["list"],
+    "total_experience": ["list"]
   },
   "Analysis": {
-    "Matching Score": "Overall matching score as a number (e.g., 85)",
-    "Unmatched Skills": ["List of skills required but not found in resume"],
-    "Matched Skills": ["List of skills that match between job and resume"],
-    "Strengths": ["List of candidate strengths relevant to the job"],
-    "Recommendations": ["List of recommendations for improving match"],
-    "Required Industrial Experience": "Required industrial experience description",
-    "Required Domain Experience": "Required domain experience description",
-    "Candidate Industrial Experience": "Candidate industrial experience description",
-    "Candidate Domain Experience": "Candidate domain experience description",
-    "Experience Threshold Compliance": "Evaluation of whether candidate meets minimum experience requirements",
-    "Recent Experience Relevance": "Assessment of recent work experience quality and relevance"
+    "Matching Score": number,
+    "Unmatched Skills": ["list"],
+    "Matched Skills": ["list"],
+    "Strengths": ["list"],
+    "Recommendations": ["list"],
+    "IndustryRelevance": "assessment of candidate fit for the specific industry",
+    "ExperienceThresholdCompliance": "evaluation of years of experience",
+    "RecentExperienceRelevance": "assessment of recent role"
   }
-}
+}`;
 
-Provide a detailed analysis with specific examples from the resume that match or don't match the job requirements.`;
-
-// Function to extract JSON from AI response
-function extractJsonFromResponse(response: string): any {
-  try {
-    return JSON.parse(response);
-  } catch (e) {
-    let cleanResponse = response.trim();
-    if (cleanResponse.startsWith("```json")) cleanResponse = cleanResponse.substring(7);
-    if (cleanResponse.startsWith("```")) cleanResponse = cleanResponse.substring(3);
-    if (cleanResponse.endsWith("```")) cleanResponse = cleanResponse.substring(0, cleanResponse.length - 3);
-    cleanResponse = cleanResponse.trim();
-    const jsonStart = cleanResponse.indexOf("{");
-    if (jsonStart !== -1) {
-      const jsonEnd = cleanResponse.lastIndexOf("}") + 1;
-      if (jsonEnd > jsonStart) {
-        return JSON.parse(cleanResponse.substring(jsonStart, jsonEnd));
-      }
-    }
-    throw e;
-  }
-}
 
 export interface MatchResult {
   Id: string;
@@ -160,38 +121,50 @@ export async function matchJobWithResume(
     // 3. PII MASKING for AI privacy
     const maskedResume = PIIManager.maskCandidateProfile(resume);
 
-    // 4. Format experience
-    let formattedExperience = 'Not specified';
-    if (Array.isArray(resume.experience) && resume.experience.length > 0) {
-      formattedExperience = resume.experience.map((exp: any, index) => {
-        const role = exp.role || 'Not specified';
-        const company = PIIManager.maskString(exp.company || 'Not specified'); // Mask company names potentially
-        const duration = exp.duration || 'Not specified';
-        return `${index + 1}. ${role} at ${company} (${duration})`;
-      }).join('\n');
-    }
+    // 4. Format context data using TOON for token optimization
+    const jobContext = {
+      title: jobDescription.title,
+      industry: (jobDescription as any).industry || 'General',
+      requiredIndustrialExperienceYears: jobDescription.requiredIndustrialExperienceYears || 0,
+      requiredDomainExperienceYears: jobDescription.requiredDomainExperienceYears || 0,
+      requiredSkills: jobDescription.skills || []
+    };
+
+    const candidateContext = {
+      alias: maskedResume.name,
+      skills: maskedResume.skills,
+      experience: Array.isArray(resume.experience) 
+        ? resume.experience.map((e: any) => {
+            if (typeof e === 'object' && e !== null) {
+              return { 
+                role: e.role || 'Unknown', 
+                company: PIIManager.maskString(e.company || 'Unknown'), 
+                duration: e.duration || 'Unknown' 
+              };
+            }
+            return { raw: String(e) };
+          }) 
+        : [],
+      candidateIndustrialExperienceYears: maskedResume.totalIndustrialExperienceYears || 0,
+      candidateDomainExperienceYears: maskedResume.totalDomainExperienceYears || 0
+    };
 
     const prompt = `
-Job Title: ${jobDescription.title}
-Required Industrial Experience Years: ${jobDescription.requiredIndustrialExperienceYears || 0}
-Required Domain Experience Years: ${jobDescription.requiredDomainExperienceYears || 0}
+Job Requirements (TOON format):
+${ToonEncoder.encode(jobContext)}
 
-Candidate Alias: ${maskedResume.name}
-Candidate Skills: ${maskedResume.skills.join('\n')}
-Candidate Experience:
-${formattedExperience}
-
-Candidate Industrial Experience Years: ${maskedResume.totalIndustrialExperienceYears || 0}
-Candidate Domain Experience Years: ${maskedResume.totalDomainExperienceYears || 0}
+Candidate Profile (TOON format):
+${ToonEncoder.encode(candidateContext)}
 `;
 
     logger.info('Sending masked candidate data to Groq for analysis', { matchId });
 
     const response = await groqChatCompletion(
-      "You are an expert HR consultant specializing in job-resume matching analysis.",
+      "You are an expert HR consultant specializing in job-resume matching analysis. Respond in valid JSON.",
       `${JOB_MATCHING_PROMPT}\n\nContext:\n${prompt}`,
       0.3,
-      1536
+      1536,
+      { type: "json_object" }
     );
 
     const duration = Date.now() - startTime;

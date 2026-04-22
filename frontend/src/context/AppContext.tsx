@@ -38,11 +38,12 @@ interface AppState {
     interviewsLoading: boolean;
 
     // UI
-    currentView: 'dashboard' | 'setup' | 'shortlist' | 'detail' | 'interviews' | 'pipeline' | 'settings' | 'profile' | 'history' | 'requisitions' | 'offers' | 'talent-pool' | 'referrals' | 'predictions' | 'knowledge' | 'fairness' | 'marketplace' | 'workflows' | 'reports' | 'onboarding';
+    currentView: 'dashboard' | 'setup' | 'shortlist' | 'detail' | 'interviews' | 'pipeline' | 'settings' | 'profile' | 'history' | 'requisitions' | 'offers' | 'talent-pool' | 'referrals' | 'predictions' | 'knowledge' | 'fairness' | 'marketplace' | 'workflows' | 'reports' | 'onboarding' | 'sourcing';
     setupStep: 'upload-jd' | 'verify-profile' | 'bulk-resumes' | 'review-launch';
     campaignFiles: File[];
     sidebarOpen: boolean;
     user: { name: string; email: string; role: string; plan: string } | null;
+    offerDraft: any | null;
 }
 
 interface AppActions {
@@ -81,6 +82,7 @@ interface AppActions {
     setView: (view: AppState['currentView']) => void;
     toggleSidebar: () => void;
     submitHMDecision: (candidateId: string, decision: 'approved' | 'rejected', notes: string) => Promise<void>;
+    setOfferDraft: (draft: any | null) => void;
     login: (user: any) => void;
     logout: () => void;
 }
@@ -104,34 +106,38 @@ const mapBatchToState = (batch: any) => ({
         },
         role_context: batch.jobData.description,
     } : null,
-    candidates: (batch.results || []).map((c: any, index: number) => ({
-        id: c._id ? c._id.toString() : (c.matchResult?.Id || c.resumeName),
-        profile: {
+    candidates: (batch.results || [])
+        .sort((a: any, b: any) => (b.matchResult?.matchScore || 0) - (a.matchResult?.matchScore || 0))
+        .map((c: any, index: number) => ({
             id: c._id ? c._id.toString() : (c.matchResult?.Id || c.resumeName),
-            name: c.matchResult?.['Resume Data']?.name || c.resumeName,
-            email: c.matchResult?.['Resume Data']?.email || 'N/A',
-            phone: c.matchResult?.['Resume Data']?.mobile_number || 'N/A',
-            extracted_skills: Array.isArray(c.matchResult?.['Resume Data']?.skills) ? c.matchResult['Resume Data'].skills : [],
-            experience_estimate: { total_years: c.matchResult?.['Resume Data']?.experience || 0 },
-            recent_role: { title: c.matchResult?.['Resume Data']?.designation || 'Professional' }
-        },
-        assessment: {
-            one_line_summary: c.matchResult?.summary || 'Candidate Assessment',
-            fit_assessment: {
-                overall_fit: (c.matchResult?.matchScore || 0) >= 80 ? 'high' : (c.matchResult?.matchScore || 0) >= 60 ? 'medium' : 'low',
-                scorecard: []
+            profile: {
+                id: c._id ? c._id.toString() : (c.matchResult?.Id || c.resumeName),
+                name: c.matchResult?.['Resume Data']?.name || c.resumeName,
+                email: c.matchResult?.['Resume Data']?.email || 'N/A',
+                phone: c.matchResult?.['Resume Data']?.mobile_number || 'N/A',
+                extracted_skills: Array.isArray(c.matchResult?.['Resume Data']?.skills) ? c.matchResult['Resume Data'].skills : [],
+                experience_estimate: { total_years: c.matchResult?.['Resume Data']?.experience || 0 },
+                recent_role: { title: c.matchResult?.['Resume Data']?.designation || 'Professional' }
             },
-            strengths: (Array.isArray(c.matchResult?.Analysis?.['Matched Skills']) ? c.matchResult.Analysis['Matched Skills'] : []).map((s: string) => ({ skill: typeof s === 'string' ? s : 'Unknown', evidence_level: 'claimed', evidence: 'From resume' })),
-            weaknesses: (Array.isArray(c.matchResult?.Analysis?.['Unmatched Skills']) ? c.matchResult.Analysis['Unmatched Skills'] : []).map((s: string) => ({ area: typeof s === 'string' ? s : 'Unknown', risk_level: 'medium', explanation: 'Missing' })),
-            interview_focus_areas: Array.isArray(c.matchResult?.Analysis?.Recommendations) ? c.matchResult.Analysis.Recommendations : []
-        },
-        rank: index + 1,
-        pinned: false,
-        removed: c.removed || false,
-        stage: c.stage || 'applied',
-        hmDecision: c.hmDecision,
-        hmNotes: c.hmNotes
-    }))
+            assessment: {
+                one_line_summary: c.matchResult?.summary || 'Candidate Assessment',
+                fit_assessment: {
+                    overall_fit: (c.matchResult?.matchScore || 0) >= 80 ? 'high' : (c.matchResult?.matchScore || 0) >= 60 ? 'medium' : 'low',
+                    scorecard: []
+                },
+                strengths: (Array.isArray(c.matchResult?.Analysis?.['Matched Skills']) ? c.matchResult.Analysis['Matched Skills'] : []).map((s: string) => ({ skill: typeof s === 'string' ? s : 'Unknown', evidence_level: 'claimed', evidence: 'From resume' })),
+                weaknesses: (Array.isArray(c.matchResult?.Analysis?.['Unmatched Skills']) ? c.matchResult.Analysis['Unmatched Skills'] : []).map((s: string) => ({ area: typeof s === 'string' ? s : 'Unknown', risk_level: 'medium', explanation: 'Missing' })),
+                interview_focus_areas: Array.isArray(c.matchResult?.Analysis?.Recommendations) ? c.matchResult.Analysis.Recommendations : [],
+                matchScore: Number(c.matchResult?.matchScore) || 0 // Sanitized for UI
+            },
+            rank: index + 1,
+            pinned: false,
+            removed: c.removed || false,
+            stage: c.stage || 'applied',
+            stageChangedAt: c.stageChangedAt,
+            hmDecision: c.hmDecision,
+            hmNotes: c.hmNotes
+        }))
 });
 
 // ==================== CONTEXT ====================
@@ -170,6 +176,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             campaignFiles: [],
             sidebarOpen: true,
             user: JSON.parse(localStorage.getItem('user') || 'null'),
+            offerDraft: null,
             ...parsedUI // Override with persisted session UI state
         };
     });
@@ -415,6 +422,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setState(prev => ({ ...prev, sidebarOpen: !prev.sidebarOpen }));
     }, []);
 
+    const setOfferDraft = useCallback((offerDraft: any | null) => {
+        setState(prev => ({ ...prev, offerDraft }));
+    }, []);
+
     const login = useCallback((user: any) => {
         localStorage.setItem('user', JSON.stringify(user));
         setState(prev => ({ ...prev, user }));
@@ -453,6 +464,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setError,
         setView,
         submitHMDecision,
+        setOfferDraft,
         toggleSidebar,
         login,
         logout,

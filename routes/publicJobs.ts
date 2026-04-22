@@ -17,21 +17,29 @@ export async function getPublicJobsHandler(req: Request): Promise<Response> {
         const db = getMongoDb();
         if (!db) return new Response(JSON.stringify({ error: "DB Unavailable" }), { status: 503 });
 
-        const jobs = await db.collection('jobs')
-            .find({ tenantId, status: "published", isPublic: true })
+        const jobs = await db.collection('requisitions')
+            .find({ tenantId, status: "published" })
             .project({
+                _id: 1,
                 title: 1,
                 company: 1,
                 location: 1,
                 employmentType: 1,
                 description: 1,
-                createdAt: 1,
-                slug: 1
+                justification: 1,
+                createdAt: 1
             })
             .sort({ createdAt: -1 })
             .toArray();
 
-        return new Response(JSON.stringify({ success: true, jobs }), { 
+        // Map _id to id for frontend
+        const mappedJobs = jobs.map(j => ({
+            ...j,
+            id: j._id.toString(),
+            description: j.description || j.justification || "Exciting role at a growing company."
+        }));
+
+        return new Response(JSON.stringify({ success: true, jobs: mappedJobs }), { 
             status: 200, 
             headers: { "Content-Type": "application/json" } 
         });
