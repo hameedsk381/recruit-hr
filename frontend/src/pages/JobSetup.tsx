@@ -20,6 +20,8 @@ import {
     DialogTitle,
     DialogDescription,
 } from "@/components/ui/dialog";
+import { ContextualHelp } from "../components/HelpCenter";
+import { PageGuide } from "../components/PageGuide";
 import {
     Upload,
     Check,
@@ -472,7 +474,13 @@ export default function JobSetup() {
                                         </div>
                                     </div>
                                     <div className="space-y-3">
-                                        <Label className="text-xs font-semibold text-foreground">Extracted Competency Matrix</Label>
+                                        <div className="flex items-center gap-1">
+                                            <Label className="text-xs font-semibold text-foreground">Extracted Competency Matrix</Label>
+                                            <ContextualHelp 
+                                                title="Smart Skill Matching" 
+                                                content="These skills were found in your job description. Marking a skill as 'Must-Have' tells the AI to prioritize candidates with that specific experience. 'Nice-to-Have' skills help find the absolute best matches among qualified candidates."
+                                            />
+                                        </div>
                                         <div className="divide-y border border-border/60 rounded-md overflow-hidden">
                                             {job.core_skills.map((s, i) => (
                                                 <div key={i} className="p-3 flex flex-wrap sm:flex-nowrap items-center justify-between hover:bg-muted/30 transition-colors group gap-3">
@@ -508,6 +516,19 @@ export default function JobSetup() {
                                 </div>
                             </div>
                             <div className="space-y-6">
+                            <PageGuide 
+                                pageKey="job-setup"
+                                title="Campaign Setup Guide"
+                                steps={[
+                                    { title: "Upload Job Description", description: "Upload a PDF or paste text to let the AI extract skills and requirements." },
+                                    { title: "Review Competency Matrix", description: "Verify the extracted skills and adjust their importance (Critical vs. Recommended)." },
+                                    { title: "Start Sourcing", description: "Once the JD is finalized, move to the Sourcing phase to start matching candidates." }
+                                ]}
+                                tips={[
+                                    "Marking a skill as 'Critical' acts as a hard filter for candidate matching.",
+                                    "You can manually add missing skills if the AI missed any niche requirements."
+                                ]}
+                            />
                                 <div className="vercel-card bg-primary text-zinc-100 border-none relative overflow-hidden">
                                     <div className="absolute top-0 right-0 p-4 opacity-10">
                                         <Target className="size-24" />

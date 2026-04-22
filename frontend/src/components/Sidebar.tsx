@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { HelpCenter } from "./HelpCenter";
 
 export default function Sidebar() {
     const { currentView, sidebarOpen, setView, job, user, logout } = useApp();
@@ -90,6 +91,16 @@ export default function Sidebar() {
                         </div>
                     ))}
                 </nav>
+
+                {/* Support & Docs */}
+                <div className="px-3 pb-4">
+                    <HelpCenter trigger={
+                        <button className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-bold text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-all">
+                            <BookOpen size={16} />
+                            <span>Help & Docs</span>
+                        </button>
+                    } />
+                </div>
 
                 {/* Theme Selector */}
                 <div className="px-6 py-4 flex items-center justify-between border-t border-border/50">
