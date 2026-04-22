@@ -47,6 +47,12 @@ const HELP_TOPICS = [
         title: 'Safe & Secure',
         icon: <ShieldCheck size={18} />,
         content: 'Your data is protected by enterprise-grade security. Our AI is also designed to ensure fair and unbiased candidate evaluations.'
+    },
+    {
+        id: 'install-extension',
+        title: 'Extension Guide',
+        icon: <Badge size={18} />,
+        content: 'Step-by-step instructions on how to load our sourcing extension into your Chrome browser.'
     }
 ];
 
@@ -186,7 +192,10 @@ export function HelpCenter({ trigger }: { trigger?: React.ReactNode }) {
                                             Source candidates directly from LinkedIn & GitHub with our official browser extension.
                                         </p>
                                     </div>
-                                    <Button className="w-full bg-background text-foreground hover:opacity-90 font-black uppercase tracking-widest text-[10px] rounded h-9 border-none">
+                                    <Button 
+                                        className="w-full bg-background text-foreground hover:opacity-90 font-black uppercase tracking-widest text-[10px] rounded h-9 border-none"
+                                        onClick={() => setSelectedTopic(HELP_TOPICS.find(t => t.id === 'install-extension'))}
+                                    >
                                         Install Extension
                                     </Button>
                                 </div>
@@ -244,6 +253,24 @@ export function HelpCenter({ trigger }: { trigger?: React.ReactNode }) {
                                              </div>
                                          </div>
                                      </div>
+
+                                     {selectedTopic.id === 'install-extension' && (
+                                         <div className="mt-8 p-6 rounded-xl border border-border bg-foreground text-background space-y-4">
+                                             <h4 className="text-sm font-black uppercase tracking-widest">Installation Steps</h4>
+                                             <div className="space-y-4">
+                                                 <p className="text-xs opacity-80">Since we are in private beta, follow these steps to load the extension:</p>
+                                                 <ol className="space-y-3 text-xs list-decimal pl-4">
+                                                     <li>Open Chrome and go to <code className="bg-background/20 px-1 rounded">chrome://extensions</code></li>
+                                                     <li>Toggle **Developer Mode** (top right) to ON.</li>
+                                                     <li>Click **Load Unpacked**.</li>
+                                                     <li>Select the <code className="bg-background/20 px-1 rounded">chrome-extension</code> folder from your project directory.</li>
+                                                 </ol>
+                                                 <div className="pt-4">
+                                                     <p className="text-[10px] opacity-60 italic">* Note: Ensure the backend is running for the extension to sync data.</p>
+                                                 </div>
+                                             </div>
+                                         </div>
+                                     )}
                                 </div>
                             </div>
                         </motion.div>

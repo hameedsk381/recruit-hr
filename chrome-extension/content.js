@@ -10,14 +10,40 @@ function injectSourcingButton() {
     
     // Style the button to float or attach to specific profiles
     if (window.location.host.includes('linkedin.com')) {
-        const target = document.querySelector('.pv-top-card-v2-ctas') || document.querySelector('.ph5.pb5');
+        // Try multiple common LinkedIn profile header selectors
+        const target = 
+            document.querySelector('.pv-top-card-v2-ctas') || 
+            document.querySelector('.ph5.pb5') || 
+            document.querySelector('.pvs-profile-actions') ||
+            document.querySelector('.mt2.relative') ||
+            document.querySelector('main.scaffold-layout__main');
+
         if (target) {
-            target.appendChild(btn);
+            // If it's a main layout fallback, we prepend to keep it at the top
+            if (target.tagName === 'MAIN') {
+                target.prepend(btn);
+            } else {
+                target.appendChild(btn);
+            }
+        } else {
+            // Floating backup for LinkedIn
+            btn.style.position = 'fixed';
+            btn.style.bottom = '20px';
+            btn.style.right = '20px';
+            btn.style.zIndex = '10000';
+            document.body.appendChild(btn);
         }
     } else if (window.location.host.includes('github.com')) {
         const target = document.querySelector('.vcard-names-container');
         if (target) {
             target.parentNode.insertBefore(btn, target.nextSibling);
+        } else {
+            // Floating backup for GitHub
+            btn.style.position = 'fixed';
+            btn.style.bottom = '20px';
+            btn.style.right = '20px';
+            btn.style.zIndex = '10000';
+            document.body.appendChild(btn);
         }
     }
 

@@ -48,9 +48,11 @@ export default function Sourcing() {
                     <p className="text-sm text-muted-foreground">Save and organize potential candidates from across the web.</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <Button variant="default" size="sm" className="h-9 px-4 font-medium bg-indigo-600 hover:bg-indigo-700">
-                        <Download size={14} className="mr-2" />
-                        Download Chrome Extension
+                    <Button variant="default" size="sm" className="h-9 px-4 font-medium bg-indigo-600 hover:bg-indigo-700" asChild>
+                        <a href="/reckruit-extension.zip" download="reckruit-extension.zip">
+                            <Download size={14} className="mr-2" />
+                            Download Chrome Extension
+                        </a>
                     </Button>
                 </div>
             </header>

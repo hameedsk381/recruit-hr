@@ -11,7 +11,7 @@ async function handleIngestion(payload) {
         
         if (!apiKey) return { success: false, error: 'No API Key configured' };
 
-        const response = await fetch(`${apiUrl || 'http://localhost:3001'}/sourcing/ingest`, {
+        const response = await fetch(`${apiUrl || 'http://localhost:3005'}/sourcing/ingest`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

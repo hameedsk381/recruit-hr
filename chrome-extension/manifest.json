@@ -8,7 +8,7 @@
     "https://*.linkedin.com/*",
     "https://*.github.com/*",
     "https://*.reckruit.ai/*",
-    "http://localhost:3001/*"
+    "http://localhost:3005/*"
   ],
   "background": {
     "service_worker": "background.js"
