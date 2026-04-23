@@ -25,8 +25,14 @@ export async function predictOfferAcceptanceHandler(req: Request, context: AuthC
 }
 
 export async function predictTimeToFillHandler(req: Request, context: AuthContext): Promise<Response> {
-  const url = new URL(req.url);
-  const resourceId = url.searchParams.get('id');
+  let resourceId = '';
+  try {
+    const body = await req.json();
+    resourceId = body.id || body.requisitionId || '';
+  } catch {
+    const url = new URL(req.url);
+    resourceId = url.searchParams.get('id') || '';
+  }
 
   if (!resourceId) return err('MISSING_ID', 'Missing requisition id', 400);
 

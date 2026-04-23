@@ -105,22 +105,37 @@ export async function publicApplyHandler(req: Request): Promise<Response> {
         const db = getMongoDb();
         if (!db) return new Response(JSON.stringify({ error: "DB Unavailable" }), { status: 503 });
 
-        // 1. Create Candidate Entry in a specific 'applications' collection for the portal
-        const application = await db.collection('applications').insertOne({
-            tenantId,
-            jobId,
-            name,
-            email,
-            resumeName: resume.name,
-            status: "applied",
-            stage: "Applied",
-            createdAt: new Date(),
-            updatedAt: new Date()
-        });
+        // 1. Extract Resume Data
+        const resumeBuffer = Buffer.from(await resume.arrayBuffer());
+        const resumeData = await extractResumeData(resumeBuffer, resume.name);
 
-        const applicationId = application.insertedId.toString();
+        // 2. Create Talent Profile (Hiring Pipeline)
+        const { TalentPoolService } = await import("../services/talentPoolService");
+        const profile = await TalentPoolService.add(tenantId, {
+            source: 'applied',
+            sourceDetail: 'Public Job Portal',
+            candidate: {
+                name: name,
+                email: email,
+                skills: resumeData.skills,
+                experienceYears: resumeData.totalIndustrialExperienceYears,
+                currentRole: resumeData.experience?.[0]?.title || "Candidate",
+                currentCompany: resumeData.experience?.[0]?.company || "Unknown",
+            },
+            tags: ['external_application'],
+            notes: [],
+            pipeline: {
+                currentStage: 'Applied',
+                requisitionId: new ObjectId(jobId),
+                lastActivity: new Date()
+            },
+            nurture: { enrolled: false },
+            gdprConsent: { given: true, date: new Date(), channel: 'WEB_FORM' }
+        }, "PUBLIC_PORTAL");
 
-        // 2. Generate Magic Link
+        const applicationId = profile._id?.toString() || "unknown";
+
+        // 3. Generate Magic Link
         const token = generateMagicLinkToken({
             email,
             candidateId: applicationId,
@@ -131,11 +146,11 @@ export async function publicApplyHandler(req: Request): Promise<Response> {
 
         const magicLink = `${process.env.FRONTEND_URL || "http://localhost:3000"}/status/${token}`;
 
-        // 3. Send Confirmation Email with Magic Link
+        // 4. Send Confirmation Email with Magic Link
         await NotificationService.dispatch({
             tenantId,
             recipientEmail: email,
-            title: "Application Received - Track your progress",
+            title: `Application Received: ${resumeData.name}`,
             message: `Hi ${name}, thank you for applying! You can track your real-time application status here: ${magicLink}`,
             channels: ["EMAIL"]
         });
@@ -143,6 +158,7 @@ export async function publicApplyHandler(req: Request): Promise<Response> {
         return new Response(JSON.stringify({ 
             success: true, 
             message: "Application submitted successfully",
+            applicationId,
             magicLinkToken: token 
         }), { status: 201 });
 

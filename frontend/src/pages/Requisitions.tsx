@@ -28,6 +28,9 @@ export default function Requisitions() {
     const [saving, setSaving] = useState(false);
     const [expanded, setExpanded] = useState<string | null>(null);
     const [filter, setFilter] = useState('');
+    const [aiPredictions, setAiPredictions] = useState<Record<string, any>>({});
+    const [biasFlags, setBiasFlags] = useState<any[]>([]);
+    const [checkingBias, setCheckingBias] = useState(false);
 
     const load = async () => {
         setLoading(true);
@@ -41,7 +44,30 @@ export default function Requisitions() {
 
     useEffect(() => { load(); }, [filter]);
 
+    const handlePredict = async (id: string) => {
+        try {
+            const res = await api.predictTimeToFill({ id });
+            if (res.success) {
+                setAiPredictions(prev => ({ ...prev, [id]: res.prediction }));
+            }
+        } catch (e) {
+            console.error('AI Prediction failed', e);
+        }
+    };
+
+    const handleBiasCheck = async () => {
+        if (!form.justification) return;
+        setCheckingBias(true);
+        try {
+            const res = await api.scanJDForBias(form.justification);
+            if (res.success) setBiasFlags(res.flags);
+        } finally {
+            setCheckingBias(false);
+        }
+    };
+
     const handleCreate = async (e: React.FormEvent) => {
+        // ... (existing handleCreate content)
         e.preventDefault();
         setSaving(true);
         try {
@@ -53,10 +79,11 @@ export default function Requisitions() {
                 budgetBand: { min: Number(form.budgetMin), max: Number(form.budgetMax), currency: form.currency },
                 justification: form.justification,
                 hiringManagerId: form.hiringManagerId,
-                targetHireDate: form.targetHireDate,
+                targetHireDate: form.targetHireDate ? new Date(form.targetHireDate).toISOString() : new Date().toISOString(),
             });
             setShowForm(false);
             setForm(EMPTY_FORM);
+            setBiasFlags([]);
             load();
         } finally {
             setSaving(false);
@@ -77,7 +104,7 @@ export default function Requisitions() {
                 </div>
                 <div className="flex gap-2">
                     <Button variant="outline" size="sm" onClick={load}><RefreshCw size={14} /></Button>
-                    <Button size="sm" onClick={() => setShowForm(v => !v)} className="gap-2">
+                    <Button size="sm" onClick={() => { setShowForm(v => !v); setBiasFlags([]); }} className="gap-2">
                         <Plus size={14} /> New Requisition
                     </Button>
                 </div>
@@ -98,7 +125,26 @@ export default function Requisitions() {
             {/* Create Form */}
             {showForm && (
                 <form onSubmit={handleCreate} className="border rounded-xl p-6 space-y-4 bg-muted/20">
-                    <h2 className="font-bold text-sm uppercase tracking-widest">New Requisition</h2>
+                    <div className="flex items-center justify-between">
+                        <h2 className="font-bold text-sm uppercase tracking-widest">New Requisition</h2>
+                        <Button type="button" variant="outline"  onClick={handleBiasCheck} disabled={checkingBias || !form.justification} className="h-7 text-[10px] gap-1 px-2 border-purple-200 text-purple-600 bg-purple-50">
+                            <Clock size={10} /> {checkingBias ? 'Scanning...' : 'Scan for Bias'}
+                        </Button>
+                    </div>
+
+                    {biasFlags.length > 0 && (
+                        <div className="p-3 bg-red-50 border border-red-100 rounded-lg space-y-1">
+                            <p className="text-[10px] font-black text-red-600 uppercase tracking-widest flex items-center gap-1">
+                                <XCircle size={10} /> Bias Detected in Justification
+                            </p>
+                            {biasFlags.map((f, i) => (
+                                <p key={i} className="text-[11px] text-red-800">
+                                    <span className="font-bold">"{f.phrase}"</span>: {f.suggestion}
+                                </p>
+                            ))}
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-2 gap-4">
                         <div className="col-span-2">
                             <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest block mb-1">Job Title</label>
@@ -148,7 +194,7 @@ export default function Requisitions() {
                     </div>
                     <div className="flex gap-2 pt-2">
                         <Button type="submit" size="sm" disabled={saving}>{saving ? 'Creating…' : 'Create Requisition'}</Button>
-                        <Button type="button" variant="ghost" size="sm" onClick={() => setShowForm(false)}>Cancel</Button>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => { setShowForm(false); setBiasFlags([]); }}>Cancel</Button>
                     </div>
                 </form>
             )}
@@ -163,7 +209,10 @@ export default function Requisitions() {
                     {reqs.map((r: any) => (
                         <div key={r._id} className="border rounded-xl overflow-hidden">
                             <button className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-muted/30 transition-colors"
-                                onClick={() => setExpanded(expanded === r._id ? null : r._id)}>
+                                onClick={() => {
+                                    setExpanded(expanded === r._id ? null : r._id);
+                                    if (expanded !== r._id && !aiPredictions[r._id]) handlePredict(r._id);
+                                }}>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-3">
                                         <span className="font-bold text-sm">{r.title}</span>
@@ -180,26 +229,91 @@ export default function Requisitions() {
                                                 className="p-1.5 rounded-md hover:bg-red-100 text-red-600 transition-colors"><XCircle size={14} /></button>
                                         </div>
                                     )}
+                                    {r.status === 'approved' && (
+                                        <Button size="sm" onClick={async (e) => {
+                                            e.stopPropagation();
+                                            if (confirm('Publish this requisition to the public portal?')) {
+                                                await api.publishRequisition(r._id);
+                                                load();
+                                            }
+                                        }} className="bg-blue-600 hover:bg-blue-700 h-7 text-[10px] px-3 font-black uppercase">Publish Externally</Button>
+                                    )}
+                                    {r.status === 'published' && (
+                                        <Button size="sm" variant="outline" onClick={(e) => {
+                                            e.stopPropagation();
+                                            const url = `${window.location.origin}/apply/${r.publicId}`;
+                                            navigator.clipboard.writeText(url);
+                                            alert('Application link copied to clipboard!');
+                                        }} className="h-7 text-[10px] px-3 font-black uppercase border-blue-200 text-blue-600">Copy Link</Button>
+                                    )}
                                     {expanded === r._id ? <ChevronUp size={14} className="text-muted-foreground" /> : <ChevronDown size={14} className="text-muted-foreground" />}
                                 </div>
                             </button>
                             {expanded === r._id && (
-                                <div className="px-5 pb-4 pt-2 border-t bg-muted/10 space-y-2">
-                                    <p className="text-xs text-muted-foreground"><span className="font-bold">Justification:</span> {r.justification || '—'}</p>
-                                    <p className="text-xs text-muted-foreground"><span className="font-bold">Budget:</span> {r.budgetBand?.currency} {r.budgetBand?.min?.toLocaleString()} – {r.budgetBand?.max?.toLocaleString()}</p>
-                                    <p className="text-xs text-muted-foreground"><span className="font-bold">Target hire:</span> {r.targetHireDate ? new Date(r.targetHireDate).toLocaleDateString() : '—'}</p>
-                                    {r.approvalChain?.length > 0 && (
-                                        <div className="flex gap-2 flex-wrap pt-1">
-                                            {r.approvalChain.map((step: any, i: number) => (
-                                                <div key={i} className="flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded-full border">
-                                                    {step.status === 'approved' ? <CheckCircle size={10} className="text-green-500" /> :
-                                                        step.status === 'rejected' ? <XCircle size={10} className="text-red-500" /> :
-                                                            <Clock size={10} className="text-yellow-500" />}
-                                                    {step.approverRole}
+                                <div className="px-5 pb-4 pt-2 border-t bg-muted/10 space-y-4">
+                                    {/* AI Insights Panel */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                                        <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-lg">
+                                            <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-1 mb-2">
+                                                <RefreshCw size={10} className={cn(!aiPredictions[r._id] && "animate-spin")} /> AI Time-to-Fill Prediction
+                                            </p>
+                                            {aiPredictions[r._id] ? (
+                                                <div className="space-y-1">
+                                                    <p className="text-lg font-black text-indigo-900">{aiPredictions[r._id].estimatedDays} Days</p>
+                                                    <p className="text-[10px] text-indigo-700 opacity-80">Range: {aiPredictions[r._id].confidenceInterval[0]} - {aiPredictions[r._id].confidenceInterval[1]} days</p>
                                                 </div>
-                                            ))}
+                                            ) : (
+                                                <p className="text-xs text-indigo-400 italic">Calculating insights...</p>
+                                            )}
                                         </div>
-                                    )}
+
+                                        <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-lg">
+                                            <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1 mb-2">
+                                                <CheckCircle size={10} /> AI Risk Assessment
+                                            </p>
+                                            {aiPredictions[r._id] ? (
+                                                <ul className="space-y-1">
+                                                    {aiPredictions[r._id].riskFactors.map((rf: string, i: number) => (
+                                                        <li key={i} className="text-[11px] text-emerald-800 flex items-start gap-1">
+                                                            <span className="mt-1 size-1 rounded-full bg-emerald-400 shrink-0" /> {rf}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            ) : (
+                                                <p className="text-xs text-emerald-400 italic">Analyzing risks...</p>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        {r.publicId && (
+                                            <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg flex items-center justify-between">
+                                                <div>
+                                                    <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Public Application URL</p>
+                                                    <p className="text-xs font-medium text-blue-800 mt-0.5">{window.location.origin}/apply/{r.publicId}</p>
+                                                </div>
+                                                <Button size="sm" variant="ghost" onClick={() => {
+                                                    navigator.clipboard.writeText(`${window.location.origin}/apply/${r.publicId}`);
+                                                    alert('Copied!');
+                                                }} className="text-blue-600 hover:bg-blue-100"><Plus size={14} className="rotate-45" /> Copy</Button>
+                                            </div>
+                                        )}
+                                        <p className="text-xs text-muted-foreground"><span className="font-bold">Justification:</span> {r.justification || '—'}</p>
+                                        <p className="text-xs text-muted-foreground"><span className="font-bold">Budget:</span> {r.budgetBand?.currency} {r.budgetBand?.min?.toLocaleString()} – {r.budgetBand?.max?.toLocaleString()}</p>
+                                        <p className="text-xs text-muted-foreground"><span className="font-bold">Target hire:</span> {r.targetHireDate ? new Date(r.targetHireDate).toLocaleDateString() : '—'}</p>
+                                        {r.approvalChain?.length > 0 && (
+                                            <div className="flex gap-2 flex-wrap pt-1">
+                                                {r.approvalChain.map((step: any, i: number) => (
+                                                    <div key={i} className="flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded-full border">
+                                                        {step.status === 'approved' ? <CheckCircle size={10} className="text-green-500" /> :
+                                                            step.status === 'rejected' ? <XCircle size={10} className="text-red-500" /> :
+                                                                <Clock size={10} className="text-yellow-500" />}
+                                                        {step.approverRole}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -209,3 +323,4 @@ export default function Requisitions() {
         </div>
     );
 }
+

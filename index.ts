@@ -50,7 +50,7 @@ import {
   listBatchesHandler
 } from "./routes/recruiterState";
 import { getTenantSettingsHandler, updateTenantSettingsHandler, updateBlindScreeningHandler } from "./routes/tenantSettings";
-import { getPublicJobsHandler, publishJobHandler } from "./routes/publicJobs";
+import { getPublicJobsHandler, publishJobHandler, getPublicJobBySlugHandler } from "./routes/publicJobs";
 import { publicApplyHandler, getApplicationStatusHandler, matchMyResumeHandler } from "./routes/candidatePortal";
 import { candidateChatHandler } from "./routes/candidateChat";
 import { ssoInitHandler, ssoCallbackHandler } from "./routes/sso";
@@ -577,6 +577,12 @@ async function startServer() {
 
           if (req.method === "GET" && normalizedPath === "/public/jobs") {
             const response = await getPublicJobsHandler(req);
+            logRequest(req, startTime, response.status);
+            return finalHandler(response);
+          }
+
+          if (req.method === "GET" && normalizedPath.startsWith("/public/jobs/")) {
+            const response = await getPublicJobBySlugHandler(req);
             logRequest(req, startTime, response.status);
             return finalHandler(response);
           }

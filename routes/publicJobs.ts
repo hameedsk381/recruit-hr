@@ -88,3 +88,42 @@ export async function publishJobHandler(req: Request, context: AuthContext): Pro
         return new Response(JSON.stringify({ success: false, error: "Failed to publish job" }), { status: 500 });
     }
 }
+
+/**
+ * [PUBLIC] Fetch a single job by its public ID/slug
+ */
+export async function getPublicJobBySlugHandler(req: Request): Promise<Response> {
+    try {
+        const url = new URL(req.url);
+        const publicId = url.pathname.split('/').pop();
+
+        if (!publicId) {
+            return new Response(JSON.stringify({ success: false, error: "Missing job slug" }), { status: 400 });
+        }
+
+        const db = getMongoDb();
+        if (!db) return new Response(JSON.stringify({ error: "DB Unavailable" }), { status: 503 });
+
+        const job = await db.collection('requisitions').findOne({ publicId, status: 'published' });
+
+        if (!job) {
+            return new Response(JSON.stringify({ success: false, error: "Job not found" }), { status: 404 });
+        }
+
+        return new Response(JSON.stringify({ 
+            success: true, 
+            job: {
+                id: job._id.toString(),
+                tenantId: job.tenantId,
+                title: job.title,
+                department: job.department,
+                location: job.location,
+                description: job.description || job.justification,
+                budgetBand: job.budgetBand,
+                createdAt: job.createdAt
+            } 
+        }), { status: 200 });
+    } catch (error) {
+        return new Response(JSON.stringify({ success: false, error: "Failed to fetch job details" }), { status: 500 });
+    }
+}

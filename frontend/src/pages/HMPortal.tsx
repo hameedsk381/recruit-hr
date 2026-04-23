@@ -31,9 +31,9 @@ export default function HMPortal() {
             <nav className="h-16 bg-white border-b px-8 flex items-center justify-between sticky top-0 z-50">
                 <div className="flex items-center gap-3">
                     <div className="size-8 bg-black rounded flex items-center justify-center text-white font-black text-lg italic">
-                        T
+                        R
                     </div>
-                    <span className="font-bold tracking-tight">TalentAcquisition.ai <span className="text-zinc-400">|</span> <span className="text-primary">HM View</span></span>
+                    <span className="font-bold tracking-tight">reckruit.ai <span className="text-zinc-400">|</span> <span className="text-primary">HM View</span></span>
                 </div>
                 
                 <div className="flex items-center gap-4">
@@ -54,7 +54,8 @@ export default function HMPortal() {
                         <Lock size={14} />
                         <span className="text-[10px] font-bold uppercase tracking-widest">Confidential Recruitment Data</span>
                     </div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest">© {new Date().getFullYear()} TalentAcquisition AI</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest">© {new Date().getFullYear()} reckruit AI</p>
+
                 </div>
             </footer>
         </div>

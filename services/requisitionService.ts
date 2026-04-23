@@ -21,6 +21,7 @@ export interface JobRequisition {
   justification: string;
   linkedJD?: ObjectId;
   approvalChain: ApprovalStep[];
+  publicId?: string;
   status: 'draft' | 'pending_approval' | 'approved' | 'published' | 'closed' | 'frozen';
   hiringManagerId: string;
   recruiterId?: string;
@@ -67,6 +68,11 @@ export class RequisitionService {
   static async getById(tenantId: string, id: string): Promise<JobRequisition | null> {
     const db = getMongoDb();
     return db.collection(COLLECTION).findOne({ _id: new ObjectId(id), tenantId }) as Promise<JobRequisition | null>;
+  }
+
+  static async getByPublicId(publicId: string): Promise<JobRequisition | null> {
+    const db = getMongoDb();
+    return db.collection(COLLECTION).findOne({ publicId, status: 'published' }) as Promise<JobRequisition | null>;
   }
 
   static async update(tenantId: string, id: string, data: Partial<JobRequisition>, userId: string): Promise<JobRequisition | null> {
@@ -123,15 +129,23 @@ export class RequisitionService {
 
   static async publish(tenantId: string, id: string, userId: string): Promise<JobRequisition | null> {
     const db = getMongoDb();
+    const req = await this.getById(tenantId, id);
+    if (!req || req.status !== 'approved') return null;
+
+    const slug = req.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const random = Math.random().toString(36).substring(2, 7);
+    const publicId = `${slug}-${random}`;
+
     await db.collection(COLLECTION).updateOne(
-      { _id: new ObjectId(id), tenantId, status: 'approved' },
-      { $set: { status: 'published', updatedAt: new Date() } }
+      { _id: new ObjectId(id), tenantId },
+      { $set: { status: 'published', publicId, updatedAt: new Date() } }
     );
 
     await AuditService.getInstance().log({
       tenantId, userId, action: 'REQUISITION_PUBLISHED',
       resource: 'requisition', resourceId: id,
       status: 'SUCCESS', requestId: crypto.randomUUID(),
+      details: { publicId }
     });
 
     return this.getById(tenantId, id);

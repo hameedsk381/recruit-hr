@@ -5,195 +5,168 @@ async function seedFull() {
     try {
         await initializeMongoClient();
         const db = getMongoDb();
-        console.log("Starting comprehensive database seeding...");
+        console.log("Seeding Sourcing, Referrals, and Offers...");
 
-        const tenantId = "reckruit-demo";
+        const targetTenants = ["reckruit-demo", "tenant-default-001"];
         const userId = "admin-id";
 
-        // 1. Tenants
-        await db.collection("tenants").updateOne(
-            { tenantId },
-            { 
-                $set: { 
-                    name: "Acme Global Corp", 
-                    industry: "Technology",
-                    onboardingStatus: "completed",
-                    createdAt: new Date() 
-                } 
-            },
-            { upsert: true }
-        );
+        for (const tenantId of targetTenants) {
+            console.log(`Seeding for tenant: ${tenantId}`);
 
-        // 2. Requisitions (Published Roles)
-        const requisitions = [
-            {
-                _id: new ObjectId("65f1a2b3c4d5e6f7a8b9c001"),
-                tenantId,
-                title: "Senior AI Engineer",
-                department: "Engineering",
-                location: "San Francisco, CA",
-                headcount: 2,
-                budgetBand: { min: 180000, max: 250000, currency: "USD" },
-                justification: "Scaling our generative AI platform.",
-                status: "published",
-                hiringManagerId: userId,
-                targetHireDate: new Date("2026-08-01"),
-                createdAt: new Date(),
-                updatedAt: new Date(),
-                description: "We are looking for a Senior AI Engineer to lead our LLM orchestration team. You will work on building scalable agentic workflows and fine-tuning models for HR-specific tasks.",
-                skills: ["Python", "PyTorch", "LLMs", "LangChain", "Kubernetes"]
-            },
-            {
-                _id: new ObjectId("65f1a2b3c4d5e6f7a8b9c002"),
-                tenantId,
-                title: "Full Stack Developer",
-                department: "Product",
-                location: "Remote (India)",
-                headcount: 3,
-                budgetBand: { min: 2500000, max: 4000000, currency: "INR" },
-                justification: "Building the next-gen recruiter dashboard.",
-                status: "published",
-                hiringManagerId: userId,
-                targetHireDate: new Date("2026-07-15"),
-                createdAt: new Date(),
-                updatedAt: new Date(),
-                description: "Join our product team to build beautiful, responsive interfaces using React and Bun. You should have experience with high-performance real-time applications.",
-                skills: ["React", "TypeScript", "Bun", "Tailwind", "PostgreSQL"]
-            },
-            {
-                _id: new ObjectId("65f1a2b3c4d5e6f7a8b9c003"),
-                tenantId,
-                title: "Talent Acquisition Manager",
-                department: "HR",
-                location: "London, UK",
-                headcount: 1,
-                budgetBand: { min: 60000, max: 85000, currency: "GBP" },
-                justification: "Driving our European expansion hiring strategy.",
-                status: "published",
-                hiringManagerId: userId,
-                targetHireDate: new Date("2026-09-01"),
-                createdAt: new Date(),
-                updatedAt: new Date(),
-                description: "We need a strategic TA Manager to lead our hiring efforts in EMEA. You will be responsible for sourcing top-tier talent and managing our agency partners.",
-                skills: ["Sourcing", "Stakeholder Management", "ATS", "Employer Branding"]
-            }
-        ];
+            const req = await db.collection("requisitions").findOne({ tenantId });
+            const reqId = req?._id;
 
-        for (const req of requisitions) {
-            await db.collection("requisitions").updateOne({ _id: req._id }, { $set: req }, { upsert: true });
-        }
-
-        // 3. Talent Profiles (Candidates)
-        const candidates = [
-            {
-                tenantId,
-                candidate: { name: "Sarah Johnson", email: "sarah.j@example.com", phone: "+1 415 555 0123" },
-                source: "referral",
-                pipeline: { 
-                    currentStage: "interview", 
-                    requisitionId: requisitions[0]._id,
-                    lastActivity: new Date()
+            // 1. Outbound Sourcing (Passive Candidates)
+            const sourcedCandidates = [
+                {
+                    tenantId,
+                    userId,
+                    source: 'chrome_extension',
+                    externalUrl: 'https://www.linkedin.com/in/johndoe-pro',
+                    candidate: { 
+                        name: 'John Doe', 
+                        email: 'john.doe@example.com',
+                        currentRole: 'Principal Engineer',
+                        currentCompany: 'Tech Giants Inc',
+                        location: 'San Jose, CA',
+                        skills: ['Node.js', 'System Design', 'Cloud Architecture']
+                    },
+                    status: 'sourced',
+                    ingestedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000)
                 },
-                tags: ["top-talent", "ai-expert"],
-                createdAt: new Date(),
-                updatedAt: new Date()
-            },
-            {
-                tenantId,
-                candidate: { name: "Arjun Mehta", email: "arjun.m@example.com", phone: "+91 98765 43210" },
-                source: "applied",
-                pipeline: { 
-                    currentStage: "shortlisted", 
-                    requisitionId: requisitions[1]._id,
-                    lastActivity: new Date()
+                {
+                    tenantId,
+                    userId,
+                    source: 'github_scanner',
+                    externalUrl: 'https://github.com/coder-jane',
+                    candidate: { 
+                        name: 'Jane Coder', 
+                        email: 'jane.coder@example.com',
+                        currentRole: 'Senior Backend Engineer',
+                        currentCompany: 'OpenSource Labs',
+                        location: 'Berlin, Germany',
+                        skills: ['Go', 'Rust', 'Docker', 'Kubernetes']
+                    },
+                    status: 'sourced',
+                    ingestedAt: new Date()
+                }
+            ];
+
+            for (const sc of sourcedCandidates) {
+                // Add to talent_profiles as sourced
+                await db.collection('talent_profiles').updateOne(
+                    { tenantId, 'candidate.email': sc.candidate.email },
+                    { 
+                        $set: { 
+                            ...sc,
+                            pipeline: { currentStage: 'sourced', lastActivity: new Date() },
+                            tags: ['sourced', 'chrome-extension'],
+                            notes: []
+                        } 
+                    },
+                    { upsert: true }
+                );
+            }
+
+            // 2. Referrals
+            const referrals = [
+                {
+                    tenantId,
+                    referrerId: 'employee-123',
+                    candidateName: 'Michael Scott',
+                    candidateEmail: 'michael.s@dundermifflin.com',
+                    candidatePhone: '+1 555 123 4567',
+                    requisitionId: reqId,
+                    status: 'shortlisted',
+                    notes: 'Great sales background, highly recommended by the Regional Manager.',
+                    bonus: { amount: 2000, currency: 'USD' },
+                    createdAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
+                    updatedAt: new Date()
                 },
-                tags: ["frontend-pro"],
-                createdAt: new Date(),
-                updatedAt: new Date()
-            },
-            {
-                tenantId,
-                candidate: { name: "Emily Smith", email: "emily.s@example.com", phone: "+44 20 7946 0000" },
-                source: "linkedin",
-                pipeline: { 
-                    currentStage: "applied", 
-                    requisitionId: requisitions[2]._id,
-                    lastActivity: new Date()
-                },
-                tags: ["experienced-hr"],
-                createdAt: new Date(),
-                updatedAt: new Date()
+                {
+                    tenantId,
+                    referrerId: 'employee-456',
+                    candidateName: 'Pam Beesly',
+                    candidateEmail: 'pam.b@example.com',
+                    requisitionId: reqId,
+                    status: 'submitted',
+                    notes: 'Strong operations and admin experience.',
+                    createdAt: new Date(),
+                    updatedAt: new Date()
+                }
+            ];
+
+            for (const ref of referrals) {
+                await db.collection('referrals').updateOne(
+                    { tenantId, candidateEmail: ref.candidateEmail },
+                    { $set: ref },
+                    { upsert: true }
+                );
+
+                // Also add to talent_profiles as referred
+                await db.collection('talent_profiles').updateOne(
+                    { tenantId, 'candidate.email': ref.candidateEmail },
+                    {
+                        $setOnInsert: {
+                            tenantId,
+                            source: 'referred',
+                            sourceDetail: `referral:${ref.referrerId}`,
+                            candidate: { name: ref.candidateName, email: ref.candidateEmail, phone: ref.candidatePhone },
+                            tags: ['referred'],
+                            notes: [],
+                            pipeline: {
+                                currentStage: 'applied',
+                                requisitionId: reqId,
+                                lastActivity: new Date(),
+                            },
+                            nurture: { enrolled: false },
+                            gdprConsent: { given: false, date: new Date(), channel: 'referral' },
+                            createdAt: new Date(),
+                            updatedAt: new Date(),
+                        },
+                    },
+                    { upsert: true }
+                );
             }
-        ];
 
-        for (const cand of candidates) {
-            await db.collection("talent_profiles").updateOne(
-                { tenantId, "candidate.email": cand.candidate.email }, 
-                { $set: cand }, 
-                { upsert: true }
-            );
-        }
+            // 3. Detailed Offers
+            const candidates = await db.collection('talent_profiles').find({ tenantId, tags: 'ai-expert' }).toArray();
+            const candId = candidates[0]?._id;
 
-        // 4. Assessment Batches (Dashboard Activity)
-        const batches = [
-            {
-                batchId: "batch-001",
-                tenantId,
-                userId,
-                status: "COMPLETED",
-                totalJobs: 12,
-                completedJobs: 12,
-                failedJobs: 0,
-                createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-                jobData: { title: "Software Engineer", company: "Acme Corp" }
-            },
-            {
-                batchId: "batch-002",
-                tenantId,
-                userId,
-                status: "COMPLETED",
-                totalJobs: 5,
-                completedJobs: 5,
-                failedJobs: 0,
-                createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-                jobData: { title: "Product Designer", company: "Acme Corp" }
+            if (candId) {
+                const offers = [
+                    {
+                        tenantId,
+                        candidateId: candId,
+                        jobId: reqId, // Using reqId as jobId for simplicity in demo
+                        requisitionId: reqId,
+                        compensation: { 
+                            base: 225000, 
+                            currency: 'USD', 
+                            bonus: 25000, 
+                            equity: '5000 RSUs',
+                            benefits: ['Health Insurance', '401k Match', 'Learning Stipend']
+                        },
+                        startDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+                        expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                        status: 'pending_approval',
+                        approvalChain: [
+                            { approverRole: 'Finance', status: 'approved', decidedAt: new Date() },
+                            { approverRole: 'VP Engineering', status: 'pending' }
+                        ],
+                        createdBy: userId,
+                        createdAt: new Date()
+                    }
+                ];
+
+                for (const offer of offers) {
+                    await db.collection('offers').updateOne(
+                        { tenantId, candidateId: candId, status: offer.status },
+                        { $set: offer },
+                        { upsert: true }
+                    );
+                }
             }
-        ];
-
-        for (const batch of batches) {
-            await db.collection("assessment_batches").updateOne({ batchId: batch.batchId }, { $set: batch }, { upsert: true });
-        }
-
-        // 5. External Job Postings
-        const postings = [
-            {
-                tenantId,
-                requisitionId: requisitions[0]._id,
-                platform: "linkedin",
-                postingId: "LI-9921",
-                url: "https://linkedin.com/jobs/9921",
-                status: "active",
-                metrics: { views: 1240, applications: 45, lastSyncedAt: new Date() },
-                publishedAt: new Date()
-            },
-            {
-                tenantId,
-                requisitionId: requisitions[1]._id,
-                platform: "indeed",
-                postingId: "ID-8832",
-                url: "https://indeed.com/jobs/8832",
-                status: "active",
-                metrics: { views: 850, applications: 22, lastSyncedAt: new Date() },
-                publishedAt: new Date()
-            }
-        ];
-
-        for (const post of postings) {
-            await db.collection("job_postings").updateOne(
-                { tenantId, platform: post.platform, requisitionId: post.requisitionId }, 
-                { $set: post }, 
-                { upsert: true }
-            );
         }
 
         console.log("Seeding completed successfully!");

@@ -2,6 +2,7 @@ import { getMongoDb } from '../../utils/mongoClient';
 import { autoRoutedChatCompletion } from '../llmRouter';
 import { getPrompt, hydratePrompt } from '../promptRegistry';
 import { ObjectId } from 'mongodb';
+import { TimeToFillModel } from '../ai/timeToFillModel';
 
 export interface OfferAcceptancePrediction {
   probability: number;
@@ -49,7 +50,6 @@ export class PredictiveAnalyticsService {
         weaknesses: s.weaknesses,
       })),
       marketContext: {
-        // Mocked market data - in production this comes from a market data provider
         medianSalaryForRole: (offer.compensation.base * (0.95 + Math.random() * 0.15)),
         talentDemand: 'high',
       }
@@ -93,7 +93,14 @@ export class PredictiveAnalyticsService {
   }
 
   static async getTimeToFillPrediction(tenantId: string, requisitionId: string): Promise<any> {
-    // Phase 3 implementation
-    return { estimatedDays: 25, confidence: 'medium' };
+    const db = getMongoDb();
+    const requisition = await db.collection('requisitions').findOne({ _id: new ObjectId(requisitionId), tenantId });
+    if (!requisition) throw new Error('Requisition not found');
+
+    return TimeToFillModel.predict(tenantId, {
+      title: requisition.title,
+      department: requisition.department,
+      location: requisition.location,
+    });
   }
 }

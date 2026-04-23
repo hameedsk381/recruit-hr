@@ -13,6 +13,7 @@ import JobApplicationFlow from './pages/JobApplicationFlow';
 import CandidateStatusTracker from './pages/CandidateStatusTracker';
 import CandidateAssessment from './pages/CandidateAssessment';
 import HMPortal from './pages/HMPortal';
+import PublicApply from './pages/PublicApply';
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
             <Route path="/portal/:id" element={<CandidatePortal />} />
             <Route path="/jobs/:tenantId" element={<PublicCareerPortal />} />
             <Route path="/jobs/:tenantId/:jobId/apply" element={<JobApplicationFlow />} />
+            <Route path="/apply/:slug" element={<PublicApply />} />
             <Route path="/status/:token" element={<CandidateStatusTracker />} />
             <Route path="/assessment/:token" element={<CandidateAssessment />} />
             <Route path="/hm/:batchId" element={<HMPortal />} />

@@ -37,14 +37,13 @@ export default function JobApplicationFlow() {
 
         setLoading(true);
         try {
-            const formData = new FormData();
-            formData.append('name', name);
-            formData.append('email', email);
-            formData.append('jobId', jobId!);
-            formData.append('tenantId', tenantId!);
-            formData.append('resume', resume);
-
-            const res = await api.publicApply(formData);
+            const res = await api.publicApply({
+                name,
+                email,
+                jobId: jobId!,
+                tenantId: tenantId!,
+                resume
+            });
             if (res.success) {
                 setChatToken(res.magicLinkToken);
                 setStep('chat');

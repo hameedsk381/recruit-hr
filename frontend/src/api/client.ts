@@ -1,4 +1,4 @@
-// Enhanced API client for talentacquisation.ai with JWT support and Async Workflows
+// Enhanced API client for reckruit.ai with JWT support and Async Workflows
 
 const getApiBaseUrl = () => {
     if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
@@ -361,21 +361,25 @@ export const api = {
         return request<{ success: boolean; jobs: any[] }>(`/public/jobs?tenantId=${tenantId}`);
     },
 
+    getPublicJobBySlug: async (slug: string) => {
+        return request<{ success: boolean; job: any }>(`/public/jobs/${slug}`);
+    },
+
+    publicApply: async (data: { name: string, email: string, jobId: string, tenantId: string, resume: File }) => {
+        return uploadFiles('/public/apply', { resume: data.resume }, {
+            name: data.name,
+            email: data.email,
+            jobId: data.jobId,
+            tenantId: data.tenantId
+        });
+    },
+
     matchMyResume: async (tenantId: string, resume: File) => {
         const formData = new FormData();
         formData.append('tenantId', tenantId);
         formData.append('resume', resume);
 
         const response = await fetch(`${API_BASE_URL}/public/match-my-resume`, {
-            method: 'POST',
-            body: formData,
-        });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response.json();
-    },
-
-    publicApply: async (formData: FormData) => {
-        const response = await fetch(`${API_BASE_URL}/public/apply`, {
             method: 'POST',
             body: formData,
         });
@@ -409,6 +413,9 @@ export const api = {
 
     approveRequisition: (id: string, data: { decision: string; comment?: string }) =>
         request<{ success: boolean; requisition: any }>(`/v1/requisitions/${id}/approve`, { method: 'POST', body: data }),
+
+    publishRequisition: (id: string) =>
+        request<{ success: boolean; requisition: any }>(`/v1/requisitions/${id}/publish`, { method: 'POST', body: {} }),
 
     // ── Phase 1: Offers ───────────────────────────────────────────────────
     listOffers: (params?: { candidateId?: string; status?: string }) =>
