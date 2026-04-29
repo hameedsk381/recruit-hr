@@ -4,6 +4,7 @@
  */
 
 import { MongoClient, Db } from 'mongodb';
+import { getRequiredEnv, isProduction } from './env';
 
 let client: MongoClient | null = null;
 let db: Db | null = null;
@@ -13,8 +14,8 @@ let db: Db | null = null;
  */
 export async function initializeMongoClient(): Promise<void> {
   try {
-    const mongoUrl = process.env.MONGODB_URL || 'mongodb://localhost:27017';
-    const dbName = process.env.MONGODB_DB_NAME || 'hr_tools';
+    const mongoUrl = isProduction() ? getRequiredEnv('MONGODB_URL') : (process.env.MONGODB_URL || 'mongodb://localhost:27017');
+    const dbName = isProduction() ? getRequiredEnv('MONGODB_DB_NAME') : (process.env.MONGODB_DB_NAME || 'hr_tools');
     
     if (!client) {
       console.log('[MongoDB] Connecting to MongoDB...');

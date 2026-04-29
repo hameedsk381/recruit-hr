@@ -62,7 +62,7 @@ export default function Interviews() {
     const [scheduleCandidate, setScheduleCandidate] = useState<any | null>(null);
     const [scheduleDate, setScheduleDate] = useState('');
     const [scheduleTime, setScheduleTime] = useState('');
-    const [scheduleType, setScheduleType] = useState<'technical' | 'culture'>('technical');
+    const [scheduleType, setScheduleType] = useState<'evaluation' | 'stakeholder'>('evaluation');
     const [schedulePlatform, setSchedulePlatform] = useState<'google_meet' | 'zoom' | 'teams' | 'slack' | 'other'>('google_meet');
 
     const filteredInterviews = interviews.filter(interview => {
@@ -190,7 +190,7 @@ export default function Interviews() {
                 setScheduleCandidate(null);
                 setScheduleDate('');
                 setScheduleTime('');
-                setScheduleType('technical');
+                setScheduleType('evaluation');
                 setSchedulePlatform('google_meet');
             }
         } catch (err) {
@@ -216,7 +216,7 @@ export default function Interviews() {
                         <CalendarDays className="size-6" />
                         Interviews
                     </h1>
-                    <p className="text-sm text-muted-foreground">Manage and automate your technical evaluations.</p>
+                    <p className="text-sm text-muted-foreground">Manage evaluation sessions and stakeholder conversations.</p>
                 </div>
                 <div className="flex items-center gap-3">
                     {calendarStatus?.connected ? (
@@ -494,7 +494,7 @@ export default function Interviews() {
                 <div className="flex-1 text-center md:text-left">
                     <h4 className="font-semibold text-sm text-foreground">Interview Copilot active</h4>
                     <p className="text-xs text-muted-foreground mt-1 max-w-2xl">
-                        AI analyzes your candidate shortlist and suggests optimal times for technical rounds based on current team velocity.
+                        AI analyzes your candidate shortlist and suggests optimal times for evaluation sessions based on current team velocity.
                     </p>
                 </div>
                 <div className="flex gap-4 items-center shrink-0">
@@ -618,14 +618,14 @@ export default function Interviews() {
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                         <div className="space-y-2">
-                            <label className="text-xs font-semibold text-foreground">Interview Type</label>
+                            <label className="text-xs font-semibold text-foreground">Session Type</label>
                             <Select value={scheduleType} onValueChange={(val: any) => setScheduleType(val)}>
                                 <SelectTrigger className="h-9">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="technical">Technical Round</SelectItem>
-                                    <SelectItem value="culture">Culture Fit</SelectItem>
+                                    <SelectItem value="evaluation">Evaluation Session</SelectItem>
+                                    <SelectItem value="stakeholder">Stakeholder Review</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>

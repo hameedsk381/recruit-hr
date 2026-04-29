@@ -203,7 +203,7 @@ export default function HMDashboard() {
                                     </div>
 
                                     <Textarea 
-                                        placeholder="Add context for your decision (e.g., 'Strong technical fit, but concerned about domain experience'...)"
+                                        placeholder="Add context for your decision (e.g., 'Strong role alignment, but concerned about domain experience'...)"
                                         className="min-h-[100px] bg-muted/30 border-none resize-none"
                                         value={notes}
                                         onChange={(e) => setNotes(e.target.value)}

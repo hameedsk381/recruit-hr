@@ -177,7 +177,7 @@ export default function CandidateDetail() {
                                         </div>
                                         <div className="space-y-4">
                                             <p className="text-sm text-indigo-900/80 font-medium leading-relaxed">
-                                                The candidate completed a technical evaluator interview. Key highlights from the transcript:
+                                                The candidate completed a structured evaluation. Key highlights from the transcript:
                                             </p>
                                             <div className="prose prose-sm prose-indigo max-w-none text-indigo-950 font-serif text-lg leading-relaxed">
                                                 {(candidate as any).screeningSummary}
@@ -309,7 +309,7 @@ export default function CandidateDetail() {
                             {(['applied', 'shortlisted', 'technical', 'culture', 'pending', 'offer'] as const).map(s => (
                                 <button
                                     key={s}
-                                    onClick={() => updateCandidateStage(candidate.id, s)}
+                                    onClick={() => void updateCandidateStage(candidate.id, s)}
                                     className={cn(
                                         "text-center px-2 py-2 rounded-md text-[10px] font-semibold uppercase tracking-wider transition-all border",
                                         candidate.stage === s 
@@ -317,7 +317,7 @@ export default function CandidateDetail() {
                                             : "bg-muted/30 text-muted-foreground border-border/50 hover:border-border hover:bg-muted/70 hover:text-foreground"
                                     )}
                                 >
-                                    {s === 'technical' ? 'Interview' : s === 'culture' ? 'Culture' : s}
+                                    {s === 'technical' ? 'Evaluation' : s === 'culture' ? 'Stakeholder' : s}
                                 </button>
                             ))}
                         </div>

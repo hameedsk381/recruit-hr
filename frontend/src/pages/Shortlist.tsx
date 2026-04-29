@@ -44,6 +44,14 @@ import { PageGuide } from '@/components/PageGuide';
 import { PipelineHealthService } from '../services/pipelineHealthService';
 import { NurtureService } from '../services/nurtureService';
 
+const STAGE_LABELS: Record<string, string> = {
+    applied: 'Applied',
+    shortlisted: 'Shortlisted',
+    technical: 'Evaluation',
+    culture: 'Stakeholder Review',
+    offer: 'Offer'
+};
+
 export default function Shortlist() {
     const {
         job,
@@ -186,11 +194,15 @@ export default function Shortlist() {
         }
     };
 
-    const handleRemove = () => {
+    const handleRemove = async () => {
         if (!removeModalId) return;
-        removeCandidate(removeModalId, removeReason);
-        setRemoveModalId(null);
-        setRemoveReason('');
+        try {
+            await removeCandidate(removeModalId, removeReason);
+            setRemoveModalId(null);
+            setRemoveReason('');
+        } catch (err) {
+            console.error('Failed to remove candidate', err);
+        }
     };
 
     const [syncingId, setSyncingId] = useState<string | null>(null);
@@ -442,7 +454,7 @@ export default function Shortlist() {
                                             setFilters(f => ({ ...f, stages: [...f.stages, stage] }));
                                         }
                                     }}>
-                                        <span className="text-xs font-medium capitalize">{stage}</span>
+                                        <span className="text-xs font-medium">{STAGE_LABELS[stage] || stage}</span>
                                         <Checkbox checked={filters.stages.includes(stage)} className="rounded" />
                                     </div>
                                 ))}
@@ -763,7 +775,7 @@ export default function Shortlist() {
                                     <span className="font-bold text-foreground">AI Scout:</span> High confidence in technical skills, but note the 2-year gap in 2021.
                                 </div>
                                 <div className="p-3 bg-muted/30 rounded-lg border text-xs leading-relaxed">
-                                    <span className="font-bold text-foreground">Hiring Manager:</span> Approved for technical round.
+                                    <span className="font-bold text-foreground">Hiring Manager:</span> Approved for the next evaluation stage.
                                 </div>
                             </div>
                         </div>

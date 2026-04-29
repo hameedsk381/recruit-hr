@@ -1,4 +1,5 @@
 import { createClient, type RedisClientType } from 'redis';
+import { getRequiredEnv, isProduction } from './env';
 
 // Create Redis client instance
 let redisClient: RedisClientType | null = null;
@@ -7,7 +8,7 @@ let redisClient: RedisClientType | null = null;
 export async function initializeRedisClient(): Promise<void> {
   try {
     // Get Redis URL from environment variable or use default
-    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+    const redisUrl = isProduction() ? getRequiredEnv('REDIS_URL') : (process.env.REDIS_URL || 'redis://localhost:6379');
     
     redisClient = createClient({
       url: redisUrl,
@@ -29,6 +30,9 @@ export async function initializeRedisClient(): Promise<void> {
   } catch (error) {
     console.error('[Redis] Failed to connect to Redis:', error);
     redisClient = null;
+    if (isProduction()) {
+      throw error;
+    }
   }
 }
 

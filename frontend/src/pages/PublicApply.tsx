@@ -4,7 +4,6 @@ import { api } from '../api/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
-    FileText, 
     Upload, 
     CheckCircle, 
     ArrowRight, 

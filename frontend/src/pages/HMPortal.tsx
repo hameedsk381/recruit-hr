@@ -6,7 +6,7 @@ import { ShieldCheck, Lock } from 'lucide-react';
 
 export default function HMPortal() {
     const { batchId } = useParams<{ batchId: string }>();
-    const { loadCampaign, job, candidatesLoading } = useApp();
+    const { loadCampaign, candidatesLoading } = useApp();
     const [authorized, setAuthorized] = useState(false);
 
     useEffect(() => {

@@ -1,5 +1,6 @@
 import { decryptCredentials } from '../integrationService';
 import { getMongoDb } from '../../utils/mongoClient';
+import { isProduction } from '../../utils/env';
 
 export interface ATSJob {
   id: string;
@@ -10,6 +11,15 @@ export interface ATSJob {
 }
 
 export class ATSService {
+  private static assertMockingAllowed(integrationId: string, capability: 'job sync' | 'score push'): void {
+    if (isProduction()) {
+      const message = `ATS ${capability} is not implemented for integration '${integrationId}'.`;
+      const error = new Error(message) as Error & { status?: number };
+      error.status = 501;
+      throw error;
+    }
+  }
+
   static async getJobs(tenantId: string, integrationId: string): Promise<ATSJob[]> {
     const db = getMongoDb();
     const record = await db.collection('tenant_integrations').findOne({ tenantId, integrationId, status: 'connected' });
@@ -27,7 +37,7 @@ export class ATSService {
       case 'workday':
         return this.fetchWorkdayJobs(creds);
       default:
-        // For others, return mock data to demonstrate functionality
+        this.assertMockingAllowed(integrationId, 'job sync');
         return this.getMockJobs(integrationId);
     }
   }
@@ -53,7 +63,7 @@ export class ATSService {
       case 'lever':
         return this.pushToLever(creds, atsCandidateId, data);
       default:
-        // Mock success for others in development
+        this.assertMockingAllowed(integrationId, 'score push');
         await new Promise(r => setTimeout(r, 800));
         return true;
     }
@@ -89,6 +99,7 @@ export class ATSService {
       return await response.json();
       */
 
+      this.assertMockingAllowed('greenhouse', 'job sync');
       return [
         { id: 'gh-101', title: 'Director of Operations', department: 'Operations', location: 'Remote', jdText: 'Lead our cross-functional teams in a high-growth environment. Focus on process optimization and scale...' },
         { id: 'gh-102', title: 'Lead Field Engineer', department: 'Engineering', location: 'Mumbai, IN', jdText: 'Manage on-site installations and client relationships for industrial automation projects...' }
@@ -100,12 +111,14 @@ export class ATSService {
   }
 
   private static async fetchLeverJobs(creds: Record<string, string>): Promise<ATSJob[]> {
+    this.assertMockingAllowed('lever', 'job sync');
     return [
       { id: 'lev-99', title: 'UX Designer', department: 'Design', location: 'New York', jdText: 'Create cinematic user experiences for our next-gen dashboard...' }
     ];
   }
 
   private static async fetchWorkdayJobs(creds: Record<string, string>): Promise<ATSJob[]> {
+    this.assertMockingAllowed('workday', 'job sync');
     return [
       { id: 'wd-55', title: 'Talent Acquisition Partner', department: 'People', location: 'London', jdText: 'Help us scale our European operations...' }
     ];

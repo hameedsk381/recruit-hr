@@ -25,19 +25,7 @@ export async function loginHandler(req: Request): Promise<Response> {
         const usersDb = db.collection('users');
         let user = await usersDb.findOne({ email, tenantId });
 
-        // Auto-provision default admins if they don't exist yet (for demo/development convenience)
-        if (!user && (email === 'admin@docapture.com' || email === 'admin@reckruit.ai')) {
-            const hashedPassword = await bcrypt.hash(password, 10);
-            const newUser = {
-                email,
-                tenantId,
-                passwordHash: hashedPassword,
-                roles: ["user", "recruiter", "admin"],
-                createdAt: new Date().toISOString()
-            };
-            const result = await usersDb.insertOne(newUser);
-            user = { _id: result.insertedId, ...newUser };
-        } else if (!user) {
+        if (!user) {
              return new Response(JSON.stringify({
                 success: false,
                 error: "Invalid email or password"

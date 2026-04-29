@@ -18,14 +18,16 @@ import type { PipelineStage, ShortlistCandidate } from '../types';
 const DEFAULT_STAGES: { id: PipelineStage; label: string; colorClass: string; bgClass: string }[] = [
     { id: 'applied', label: 'Applied', colorClass: 'text-slate-500', bgClass: 'bg-slate-500' },
     { id: 'shortlisted', label: 'Shortlisted', colorClass: 'text-blue-500', bgClass: 'bg-blue-500' },
-    { id: 'technical', label: 'Technical', colorClass: 'text-purple-500', bgClass: 'bg-purple-500' },
-    { id: 'culture', label: 'Culture Fit', colorClass: 'text-indigo-500', bgClass: 'bg-indigo-500' },
+    { id: 'technical', label: 'Evaluation', colorClass: 'text-purple-500', bgClass: 'bg-purple-500' },
+    { id: 'culture', label: 'Stakeholder Review', colorClass: 'text-indigo-500', bgClass: 'bg-indigo-500' },
     { id: 'pending', label: 'Decision', colorClass: 'text-amber-500', bgClass: 'bg-amber-500' },
     { id: 'offer', label: 'Offer', colorClass: 'text-emerald-500', bgClass: 'bg-emerald-500' },
 ];
 
 const TYPE_COLORS: Record<string, string> = {
     screening: 'bg-slate-500',
+    evaluation: 'bg-purple-500',
+    stakeholder: 'bg-indigo-500',
     technical: 'bg-purple-500',
     culture: 'bg-indigo-500',
     decision: 'bg-amber-500',
@@ -77,7 +79,10 @@ export default function Pipeline() {
     const getInterviewForCandidate = (candidateId: string, stage: PipelineStage) => {
         return interviews.find(i =>
             i.candidateId === candidateId &&
-            (stage === 'technical' ? i.type === 'technical' : i.type === 'culture')
+            (
+                (stage === 'technical' && (i.type === 'technical' || i.type === 'evaluation')) ||
+                (stage === 'culture' && (i.type === 'culture' || i.type === 'stakeholder'))
+            )
         );
     };
 
@@ -87,7 +92,7 @@ export default function Pipeline() {
         if (!destination) return;
         if (destination.droppableId === source.droppableId && destination.index === source.index) return;
 
-        updateCandidateStage(draggableId, destination.droppableId as PipelineStage);
+        void updateCandidateStage(draggableId, destination.droppableId as PipelineStage);
     };
 
     return (
@@ -291,5 +296,3 @@ export default function Pipeline() {
         </div>
     );
 }
-
-

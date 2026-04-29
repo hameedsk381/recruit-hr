@@ -61,6 +61,7 @@ import { auditMiddleware } from "./middleware/auditMiddleware";
 import { resolveAllowedOrigin, applyCorsHeaders, buildCorsHeaders } from "./middleware/corsMiddleware";
 import { addSecurityHeaders } from "./middleware/securityHeaders";
 import { verifyWebhookSignature, reconstructRequest } from "./middleware/webhookAuth";
+import { validateProductionEnv } from "./utils/env";
 
 // Phase 1 — v1 routes
 import { healthHandler, readyHandler, metricsHandler } from "./routes/health";
@@ -134,6 +135,7 @@ import { JobBoardService } from "./services/jobBoardService";
 
 // Load environment variables
 config();
+validateProductionEnv();
 
 import { listAPIKeysHandler, createAPIKeyHandler, revokeAPIKeyHandler } from "./routes/apiKeys";
 

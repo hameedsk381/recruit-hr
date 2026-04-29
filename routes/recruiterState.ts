@@ -110,6 +110,23 @@ export async function updateCandidateHandler(req: Request, context: AuthContext)
         const db = getMongoDb();
         if (!db) return new Response(JSON.stringify({ error: "DB Unavailable" }), { status: 503 });
 
+        const batch = await db.collection('assessment_batches').findOne(
+            { batchId, userId: context.userId, tenantId: context.tenantId },
+            { projection: { results: 1 } }
+        );
+
+        if (!batch) {
+            return new Response(JSON.stringify({ success: false, error: "Batch not found" }), { status: 404 });
+        }
+
+        const candidateExists = Array.isArray(batch.results) && batch.results.some((result: any) =>
+            result?.matchResult?.Id === candidateId || result?.resumeName === candidateId
+        );
+
+        if (!candidateExists) {
+            return new Response(JSON.stringify({ success: false, error: "Candidate not found" }), { status: 404 });
+        }
+
         // Update the specific result within the batch results array
         // We use positional operator $[elem] to find the candidate by name/ID
         const now = new Date();
@@ -129,7 +146,7 @@ export async function updateCandidateHandler(req: Request, context: AuthContext)
         if (hmDecision) updateFields["results.$[elem].hmDecision"] = hmDecision;
         if (hmNotes) updateFields["results.$[elem].hmNotes"] = hmNotes;
 
-        await db.collection('assessment_batches').updateOne(
+        const updateResult = await db.collection('assessment_batches').updateOne(
             { batchId, userId: context.userId, tenantId: context.tenantId },
             { $set: updateFields },
             { 
@@ -141,6 +158,10 @@ export async function updateCandidateHandler(req: Request, context: AuthContext)
                 }] 
             }
         );
+
+        if (updateResult.modifiedCount === 0) {
+            return new Response(JSON.stringify({ success: false, error: "No changes applied" }), { status: 409 });
+        }
 
         // --- ASYNC WORKFLOW TRIGGERS ---
         // 1. Triggered if a candidate is moved to 'shortlisted' stage

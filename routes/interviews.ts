@@ -91,16 +91,20 @@ export async function scheduleInterviewHandler(req: Request, context: AuthContex
             focusAreas
         });
 
-        // Trigger Workflow Event
-        await WorkflowService.triggerEvent({
-            type: 'INTERVIEW_CONFIRMED',
-            tenantId: context.tenantId,
-            payload: {
-                candidateName,
-                startTime: startTimeDate.toLocaleString(),
-                recruiterEmail: context.email
-            }
-        });
+        // Notification workflows should not make a confirmed interview fail.
+        try {
+            await WorkflowService.triggerEvent({
+                type: 'INTERVIEW_CONFIRMED',
+                tenantId: context.tenantId,
+                payload: {
+                    candidateName,
+                    startTime: startTimeDate.toLocaleString(),
+                    recruiterEmail: context.email
+                }
+            });
+        } catch (workflowError) {
+            logger.warn('Interview scheduled but workflow trigger failed', { workflowError });
+        }
 
         return new Response(JSON.stringify({ success: true, interview }), {
             status: 201,

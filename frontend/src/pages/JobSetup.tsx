@@ -59,7 +59,7 @@ export default function JobSetup() {
     const [dragOver, setDragOver] = useState(false);
     const [isProcessingBatch, setIsProcessingBatch] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const resumeInputRef = useRef<HTMLInputElement>(null);
+    const candidateFileInputRef = useRef<HTMLInputElement>(null);
 
     // ATS Integration State
     const [showAtsModal, setShowAtsModal] = useState(false);
@@ -115,7 +115,7 @@ export default function JobSetup() {
                 const extractedJob: JobDescription = {
                     id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15),
                     title: atsJob.title || result.data.title || 'Untitled Role',
-                    company: atsJob.company || result.data.company || 'Imported from ATS',
+                    company: atsJob.company || result.data.company || 'Imported Role',
                     core_skills: (result.data.skills || []).map((skill: string, index: number) => ({
                         skill,
                         weight: index < 3 ? 'critical' : index < 6 ? 'important' : 'nice_to_have',
@@ -138,7 +138,7 @@ export default function JobSetup() {
             setJob({
                 id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15),
                 title: atsJob.title,
-                company: 'Imported from ATS',
+                company: 'Imported Role',
                 core_skills: [],
                 experience_expectations: { min_years: 3, domain_specific: atsJob.department },
                 role_context: atsJob.jdText,
@@ -161,7 +161,7 @@ export default function JobSetup() {
                 const extractedJob: JobDescription = {
                     id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15),
                     title: result.data.title || 'Untitled Role',
-                    company: result.data.company || 'New Partner',
+                    company: result.data.company || 'Hiring Team',
                     core_skills: (result.data.skills || []).map((skill: string, index: number) => ({
                         skill,
                         weight: index < 3 ? 'critical' : index < 6 ? 'important' : 'nice_to_have',
@@ -179,7 +179,7 @@ export default function JobSetup() {
         } catch (err: any) {
             const errorMsg = err.message || '';
             if (errorMsg.includes('DOCUMENT_IS_RESUME')) {
-                setError('job', 'We detected that you uploaded a Resume instead of a Job Description. Please provide the Job Description to continue.');
+                setError('job', 'We detected that you uploaded a candidate profile instead of a role brief. Please provide the role brief to continue.');
             } else {
                 setError('job', `Analysis failed: ${errorMsg || 'Please try a different PDF.'}`);
             }
@@ -579,10 +579,10 @@ export default function JobSetup() {
                         <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
                             <div 
                                 className="md:col-span-3 border border-dashed rounded-xl flex flex-col items-center justify-center p-12 text-center space-y-4 hover:border-foreground/30 transition-all cursor-pointer bg-card/50"
-                                onClick={() => resumeInputRef.current?.click()}
+                                onClick={() => candidateFileInputRef.current?.click()}
                             >
                                 <input 
-                                    ref={resumeInputRef} 
+                                    ref={candidateFileInputRef} 
                                     type="file" 
                                     multiple 
                                     className="hidden" 

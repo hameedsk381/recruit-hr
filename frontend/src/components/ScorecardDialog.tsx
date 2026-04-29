@@ -35,11 +35,11 @@ interface ScorecardProps {
 }
 
 const RATING_CATEGORIES = [
-    'Technical Skills',
-    'Problem Solving',
+    'Role Capability',
+    'Applied Judgment',
     'Communication',
-    'Culture Fit',
-    'Leadership Potential'
+    'Stakeholder Alignment',
+    'Growth Potential'
 ];
 
 const RECOMMENDATIONS = [

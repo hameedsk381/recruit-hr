@@ -24,7 +24,7 @@ export interface ExperienceExpectation {
 export interface WorkflowStage {
     id: string;
     label: string;
-    type: 'screening' | 'technical' | 'culture' | 'decision' | 'offer' | 'onboarding';
+    type: 'screening' | 'evaluation' | 'stakeholder' | 'decision' | 'offer' | 'onboarding' | 'technical' | 'culture';
     order: number;
 }
 
@@ -175,7 +175,7 @@ export interface Interview {
     startTime: string;
     endTime: string;
     status: 'scheduled' | 'completed' | 'cancelled' | 'pending';
-    type: 'technical' | 'hr' | 'culture' | 'coding';
+    type: 'evaluation' | 'stakeholder' | 'screening' | 'discussion' | 'technical' | 'hr' | 'culture' | 'coding';
     meetingPlatform?: MeetingPlatform;
     meetingLink?: string;
     meetingId?: string;

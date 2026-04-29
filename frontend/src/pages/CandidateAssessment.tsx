@@ -14,6 +14,8 @@ import {
 import { cn } from "@/lib/utils";
 import api from '../api/client';
 
+const ASSESSMENTS_ENABLED = import.meta.env.VITE_ENABLE_CANDIDATE_ASSESSMENTS === 'true';
+
 export default function CandidateAssessment() {
     const { token } = useParams();
     const [problem, setProblem] = useState<any>(null);
@@ -23,6 +25,8 @@ export default function CandidateAssessment() {
     const [evaluation, setEvaluation] = useState<any>(null);
 
     useEffect(() => {
+        if (!ASSESSMENTS_ENABLED) return;
+
         const loadProblem = async () => {
             try {
                 // In a production flow, 'token' would be exchanged for a batchId and candidate context
@@ -39,6 +43,22 @@ export default function CandidateAssessment() {
 
         loadProblem();
     }, [token]);
+
+    if (!ASSESSMENTS_ENABLED) {
+        return (
+            <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
+                <div className="max-w-xl w-full vercel-card bg-slate-900 border-amber-500/30 p-8 space-y-4 text-center">
+                    <div className="size-16 bg-amber-500/10 text-amber-500 rounded-full flex items-center justify-center mx-auto">
+                        <AlertCircle size={32} />
+                    </div>
+                    <h1 className="text-2xl font-bold text-white">Assessment Unavailable</h1>
+                    <p className="text-slate-400">
+                        Candidate assessments are disabled until the secure production flow is fully configured.
+                    </p>
+                </div>
+            </div>
+        );
+    }
 
     const handleSubmit = async () => {
         setSubmitting(true);

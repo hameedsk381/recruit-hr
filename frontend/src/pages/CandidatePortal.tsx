@@ -23,9 +23,8 @@ export default function CandidatePortal() {
     const handleStart = async () => {
         try {
             setStatus('generating');
-            // Assuming generic Software Engineer JD for demo
-            const jd = { title: "Software Engineer", requirements: ["React", "TypeScript", "Node.js"] };
-            const res = await api.generateVoiceQuestions(jd, "Focus on modern frontend architecture.");
+            const jd = { title: "Role Opportunity", requirements: ["Role-relevant experience", "Communication", "Judgment"] };
+            const res = await api.generateVoiceQuestions(jd, "Focus on transferable experience, situational judgment, and role-relevant strengths.");
             if (res.success && res.questions) {
                 setQuestions(res.questions);
                 setStatus('ready');
@@ -85,7 +84,7 @@ export default function CandidatePortal() {
             
             const questionText = questions[currentQIndex]?.question || "Tell me about yourself.";
             // Submit to the advanced Multi-Modal API gap
-            const res = await api.evaluateAudioAnswer(audioFile, questionText, "Candidate is interviewing for a Software Engineering role.");
+            const res = await api.evaluateAudioAnswer(audioFile, questionText, "Candidate is being evaluated for a role-specific opportunity.");
             
             if (res.success && res.evaluation) {
                 setEvaluation(res.evaluation);

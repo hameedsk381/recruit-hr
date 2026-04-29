@@ -60,10 +60,10 @@ interface AppActions {
     setCandidatesLoading: (loading: boolean) => void;
     selectCandidate: (id: string | null) => void;
     pinCandidate: (id: string) => void;
-    removeCandidate: (id: string, reason: string) => void;
-    restoreCandidate: (id: string) => void;
+    removeCandidate: (id: string, reason: string) => Promise<void>;
+    restoreCandidate: (id: string) => Promise<void>;
     reorderCandidates: (newOrder: string[]) => void;
-    updateCandidateStage: (id: string, stage: ShortlistCandidate['stage']) => void;
+    updateCandidateStage: (id: string, stage: ShortlistCandidate['stage']) => Promise<void>;
 
     // Copilot
     toggleCopilot: () => void;
@@ -194,6 +194,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
         sessionStorage.setItem('frontend_ui_state', JSON.stringify(stateToPersist));
     }, [state.currentView, state.setupStep, state.sidebarOpen, state.job, state.batchId, state.selectedCandidateId]);
 
+    function applyError(type: 'job' | 'candidates' | 'dashboard', error: string | null) {
+        const keyMap = {
+            job: 'jobError',
+            candidates: 'candidatesError',
+            dashboard: 'dashboardError'
+        } as const;
+
+        setState(prev => ({
+            ...prev,
+            [keyMap[type]]: error,
+        }));
+    }
+
     // ========== HYDRATION ==========
     useEffect(() => {
         const token = localStorage.getItem('auth_token');
@@ -283,28 +296,51 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }));
     }, []);
 
-    const removeCandidate = useCallback((id: string, reason: string) => {
-        setState(prev => {
-            if (prev.batchId) {
-                api.updateCandidate(prev.batchId!, id, { removed: true, removalReason: reason });
-            }
-            return {
+    const removeCandidate = useCallback(async (id: string, reason: string) => {
+        if (!state.batchId) {
+            applyError('candidates', 'No active batch selected.');
+            throw new Error('No active batch selected.');
+        }
+
+        applyError('candidates', null);
+
+        try {
+            await api.updateCandidate(state.batchId, id, { removed: true, removalReason: reason });
+            setState(prev => ({
                 ...prev,
                 candidates: prev.candidates.map(c =>
                     c.id === id ? { ...c, removed: true, removal_reason: reason } : c
                 ),
-            };
-        });
-    }, []);
+            }));
+        } catch (err: any) {
+            const message = err?.message || 'Failed to remove candidate.';
+            applyError('candidates', message);
+            throw err;
+        }
+    }, [state.batchId]);
 
-    const restoreCandidate = useCallback((id: string) => {
-        setState(prev => ({
-            ...prev,
-            candidates: prev.candidates.map(c =>
-                c.id === id ? { ...c, removed: false, removal_reason: undefined } : c
-            ),
-        }));
-    }, []);
+    const restoreCandidate = useCallback(async (id: string) => {
+        if (!state.batchId) {
+            applyError('candidates', 'No active batch selected.');
+            throw new Error('No active batch selected.');
+        }
+
+        applyError('candidates', null);
+
+        try {
+            await api.updateCandidate(state.batchId, id, { removed: false, removalReason: null });
+            setState(prev => ({
+                ...prev,
+                candidates: prev.candidates.map(c =>
+                    c.id === id ? { ...c, removed: false, removal_reason: undefined } : c
+                ),
+            }));
+        } catch (err: any) {
+            const message = err?.message || 'Failed to restore candidate.';
+            applyError('candidates', message);
+            throw err;
+        }
+    }, [state.batchId]);
 
     const reorderCandidates = useCallback((newOrder: string[]) => {
         setState(prev => {
@@ -319,43 +355,62 @@ export function AppProvider({ children }: { children: ReactNode }) {
         });
     }, []);
 
-    const updateCandidateStage = useCallback((id: string, stage: ShortlistCandidate['stage']) => {
-        setState(prev => {
-            if (prev.batchId) {
-                api.updateCandidate(prev.batchId!, id, { stage });
-            }
-            return {
+    const updateCandidateStage = useCallback(async (id: string, stage: ShortlistCandidate['stage']) => {
+        if (!state.batchId) {
+            applyError('candidates', 'No active batch selected.');
+            throw new Error('No active batch selected.');
+        }
+
+        applyError('candidates', null);
+
+        try {
+            await api.updateCandidate(state.batchId, id, { stage });
+            setState(prev => ({
                 ...prev,
                 candidates: prev.candidates.map(c =>
                     c.id === id ? { ...c, stage } : c
                 ),
-            };
-        });
-    }, []);
+            }));
+        } catch (err: any) {
+            const message = err?.message || 'Failed to update candidate stage.';
+            applyError('candidates', message);
+            throw err;
+        }
+    }, [state.batchId]);
 
     const submitHMDecision = useCallback(async (candidateId: string, decision: 'approved' | 'rejected', notes: string) => {
         const stage = decision === 'approved' ? 'hm_approved' : 'hm_rejected';
-        setState(prev => {
-            if (prev.batchId) {
-                api.updateCandidate(prev.batchId!, candidateId, { 
-                    hmDecision: decision, 
-                    hmNotes: notes,
-                    stage
-                 });
-            }
-            return {
+        if (!state.batchId) {
+            applyError('candidates', 'No active batch selected.');
+            throw new Error('No active batch selected.');
+        }
+
+        applyError('candidates', null);
+
+        try {
+            await api.updateCandidate(state.batchId, candidateId, {
+                hmDecision: decision,
+                hmNotes: notes,
+                stage
+            });
+
+            setState(prev => ({
                 ...prev,
                 candidates: prev.candidates.map(c =>
-                    c.id === candidateId ? { 
-                        ...c, 
-                        hmDecision: decision, 
+                    c.id === candidateId ? {
+                        ...c,
+                        hmDecision: decision,
                         hmNotes: notes,
                         stage
                     } : c
                 ),
-            };
-        });
-    }, []);
+            }));
+        } catch (err: any) {
+            const message = err?.message || 'Failed to submit hiring manager decision.';
+            applyError('candidates', message);
+            throw err;
+        }
+    }, [state.batchId]);
 
     const toggleCopilot = useCallback(() => {
         setState(prev => ({
@@ -403,15 +458,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const setError = useCallback((type: 'job' | 'candidates' | 'dashboard', error: string | null) => {
-        const keyMap = {
-            job: 'jobError',
-            candidates: 'candidatesError',
-            dashboard: 'dashboardError'
-        };
-        setState(prev => ({
-            ...prev,
-            [keyMap[type]]: error,
-        }));
+        applyError(type, error);
     }, []);
 
     const setView = useCallback((currentView: AppState['currentView']) => {

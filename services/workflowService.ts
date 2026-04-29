@@ -134,6 +134,11 @@ async function handleInterviewConfirmed(tenantId: string, payload: any) {
  */
 export class WorkflowService {
     static async triggerEvent(event: WorkflowEvent) {
+        if (!workflowQueue) {
+            console.warn(`[WorkflowService] Queue unavailable, skipping event ${event.type} for tenant ${event.tenantId}`);
+            return;
+        }
+
         await workflowQueue.add(event.type, event, {
             removeOnComplete: true,
             attempts: 3,

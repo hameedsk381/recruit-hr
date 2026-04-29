@@ -28,7 +28,7 @@ const HELP_TOPICS = [
         id: 'getting-started',
         title: 'Getting Started',
         icon: <Zap size={18} />,
-        content: 'Start your search by uploading a Job Description. Our AI will automatically identify the key skills and experience needed for the role.'
+        content: 'Start your search by uploading a role brief. Our AI will automatically identify the key skills, responsibilities, and experience needed for the role.'
     },
     {
         id: 'ai-matching',
@@ -40,7 +40,7 @@ const HELP_TOPICS = [
         id: 'skill-weighting',
         title: 'Prioritizing Skills',
         icon: <Sparkles size={18} />,
-        content: 'Tell the AI which skills are "must-haves" and which are "nice-to-haves" to fine-tune your candidate rankings.'
+        content: 'Tell the AI which capabilities are critical, important, or optional to fine-tune your candidate rankings.'
     },
     {
         id: 'privacy',
@@ -51,7 +51,7 @@ const HELP_TOPICS = [
     {
         id: 'install-extension',
         title: 'Extension Guide',
-        icon: <Badge size={18} />,
+        icon: <BookOpen size={18} />,
         content: 'Step-by-step instructions on how to load our sourcing extension into your Chrome browser.'
     }
 ];
@@ -97,7 +97,7 @@ function HelpCard({ topic, idx, onSelect }: { topic: any, idx: number, onSelect:
                         <div className="pt-4 mt-4 border-t border-border/40 space-y-3">
                             <h5 className="text-[9px] font-black uppercase tracking-widest text-foreground/50">Pro Tip</h5>
                             <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                We use smart AI to read between the lines of a resume, so you don't have to spend hours on manual screening.
+                                We use smart AI to interpret candidate profiles, so you don't have to spend hours on manual screening.
                                 <br/><br/>
                                 <button className="text-foreground hover:underline flex items-center gap-1 font-bold" onClick={onSelect}>
                                     View Full Guide <ExternalLink size={10} />
